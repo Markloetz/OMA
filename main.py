@@ -45,6 +45,13 @@ def cpsd_matrix(data, fs):
     cpsd = np.zeros((n_cols, n_cols, n_fft), dtype=np.complex_)
     f = np.zeros((n_fft, 1))
 
+    # CSPD-Parameters
+    nperseg = fs/0.01
+    noverlap = np.floor(nperseg*0.5)
+    window = 'hann'
+    print(nperseg)
+    print(noverlap)
+
     # Build cpsd-matrix
     for i in range(n_cols):
         for j in range(n_cols):
@@ -52,7 +59,9 @@ def cpsd_matrix(data, fs):
                                                 data[:, j],
                                                 fs=fs,
                                                 detrend=False,
-                                                window='hamming',
+                                                nperseg=nperseg,
+                                                noverlap=noverlap,
+                                                window=window,
                                                 nfft=n_fft * 2 - 1)
 
     # return cpsd-matrix
@@ -66,57 +75,36 @@ def sv_decomp(mat):
     # preallocate singular values and mode shapes
     s1 = np.zeros((n_rows, 1))
     u1 = np.zeros((n_rows, n_cols), dtype=complex)
+    s2 = np.zeros((n_rows, 1))
+    u2 = np.zeros((n_rows, n_cols), dtype=complex)
+    s3 = np.zeros((n_rows, 1))
+    u3 = np.zeros((n_rows, n_cols), dtype=complex)
 
     # SVD
     for i in range(n_rows):
         u, s, _ = np.linalg.svd(mat[:, :, i])
         u1[i, :] = u[:, 0].transpose()
         s1[i, :] = s[0]
+        u2[i, :] = u[:, 1].transpose()
+        s2[i, :] = s[1]
+        u2[i, :] = u[:, 2].transpose()
+        s2[i, :] = s[2]
 
     # return function outputs
-    return s1, u1
+    return s1, u1, s2, u2, s3, u3,
 
 
-def aut_peak(x, y, n):
-    # find all peaks
+def peak_picking(x, y, y2, y3):
     y = y.ravel()
-    locs, _ = scipy.signal.find_peaks(y)
-    vals = y[locs]
-    # Sort peak values and get corresponding peak locations
-    sorted_indices = (-vals).argsort()  # Sort indices in descending order
-    sorted_locs = locs[sorted_indices]
-    sorted_vals = vals[sorted_indices]
-
-    # output n number of peaks and their corresponding x value
-    out1 = x[sorted_locs]
-    return out1[:n], sorted_vals[:n]
-
-
-def aut_peak(x, y, n):
-    # find all peaks
-    y = y.ravel()
-    locs, _ = scipy.signal.find_peaks(y)
-    vals = y[locs]
-    # Sort peak values and get corresponding peak locations
-    sorted_indices = (-vals).argsort()  # Sort indices in descending order
-    sorted_locs = locs[sorted_indices]
-    sorted_vals = vals[sorted_indices]
-
-    # output n number of peaks and their corresponding x value
-    out1 = x[sorted_locs]
-    return out1[:n], sorted_vals[:n]
-
-
-def peak_picking(x, y):
-
-    y = y.ravel()
+    y2 = y2.ravel()
+    y3 = y3.ravel()
     x = x.ravel()
     locs, _ = scipy.signal.find_peaks(y)
     y_data = y[locs]
     x_data = x[locs]
 
     # Create a figure and axis
-    fig, ax = plt.subplots()
+    figure, ax = plt.subplots()
 
     # Store the selected points
     selected_points = {'x': [], 'y': []}
@@ -142,10 +130,20 @@ def peak_picking(x, y):
             plt.draw()
 
     # Connect the onclick function to the figure
-    cid = fig.canvas.mpl_connect('button_press_event', onclick)
+    cid = figure.canvas.mpl_connect('button_press_event', onclick)
 
     # Plot the blue data points
     ax.plot(x, y)  # Plot the data points in blue
+    if max(y2) <= 0.0001*max(y):
+        scaling1 = 1
+    else:
+        scaling1 = max(y) / max(y2) / 2
+    ax.plot(x, (y2*scaling1), linewidth=0.7, color='black')
+    if max(y3) <= 0.0001*max(y):
+        scaling2 = 1
+    else:
+        scaling2 = max(y) / max(y3) / 2
+    ax.plot(x, (y3*scaling2), linewidth=0.7, color='black')
     ax.plot(x_data, y_data, 'bo')  # Plot the data points in blue
     ax.set_title('Click to select points')
     ax.set_xlabel('X')
@@ -153,6 +151,12 @@ def peak_picking(x, y):
 
     # Show the plot
     plt.show()
+
+    # remove multiple entries at same spot
+    for i in range(1, len(selected_points['x'])):
+        if selected_points['x'][i] == selected_points['x'][i-1]:
+            del selected_points['x'][i]
+            del selected_points['y'][i]
 
     # Store number of selected points
     n_points = len(selected_points['x'])
@@ -165,80 +169,82 @@ def mac_calc(phi, u):
     return (np.abs(phi.conj().T @ u) ** 2) / ((phi.conj().T @ phi) * (u.conj().T @ u))
 
 
-def find_widest_range(arr):
-    nonzero_indices = np.where(arr != 0)
+def find_widest_range(array, center_indices):
+    array = array.flatten()
+    groups = []
+    group_indices = []
 
-    # Initialize variables to store the start and end indices of the current non-zero range
-    start_index = 0
-    end_index = 0
+    current_group = []
+    current_group_index = []
 
-    # Initialize variables to store the length and indices of the longest non-zero range
-    max_length = 0
-    max_start_index = 0
-    max_end_index = 0
+    for i, val in enumerate(array):
+        if val != 0:
+            current_group.append(val)
+            current_group_index.append(i)
+        elif current_group:
+            groups.append(current_group)
+            group_indices.append(current_group_index)
+            current_group = []
+            current_group_index = []
 
-    # Iterate through the non-zero indices
-    for i in range(1, len(nonzero_indices)):
-        # If the current index is contiguous with the previous index
-        if nonzero_indices[i] == nonzero_indices[i - 1] + 1:
-            # Update the end index of the current non-zero range
-            end_index = i
-        else:
-            # Calculate the length of the current non-zero range
-            length = end_index - start_index + 1
-            # If the current range is longer than the longest range found so far, update the max indices
-            if length > max_length:
-                max_length = length
-                max_start_index = start_index
-                max_end_index = end_index
-            # Update the start and end indices for the next non-zero range
-            start_index = i
-            end_index = i
+    # If the last group extends to the end of the array
+    if current_group:
+        groups.append(current_group)
+        group_indices.append(current_group_index)
 
-    # Calculate the indices of the largest non-zero range
-    return nonzero_indices[max_start_index:max_end_index + 1]
+    # find length of the groups and determine if group is positioned round the specified point
+    lengths = np.zeros((len(group_indices)))
+    for i in range(len(group_indices)):
+        if set(center_indices).issubset(set(group_indices[i])):
+            lengths[i] = len(group_indices[i])
 
-
-def sdof_func(t, omega_n, zeta_):
-    # Calculate acceleration
-    x_dotdot = x0 * omega_n ** 2 * np.exp(-zeta_ * omega_n * t) * np.cos(omega_n * np.sqrt(1 - zeta_ ** 2) * t) - 2 \
-               * zeta_ * x0 * omega_n * np.exp(-zeta_ * omega_n * t) * np.sin(omega_n * np.sqrt(1 - zeta_ ** 2) * t)
-    return x_dotdot
+    # extract indices with maximum length
+    max_length_ind = np.argmax(lengths)
+    return group_indices[max_length_ind]
 
 
-def sdof_fit(y, t, omega_0):
+def sdof_frf(f, m, k, zeta):
+    omega = 2 * np.pi * f
+    h = 1 / (-m * omega**2 + 1j * 2 * np.pi * f * zeta * m + k)
+    return np.abs(h)
+
+
+def sdof_frf_fit(y, f):
+    y = y[~np.isnan(y)]
+    f = f[~np.isnan(f)]
+
+    # rearrange arrays
     y = y.ravel()
-    t = t.ravel()
+    f = f.ravel()
 
-    # Initial guess for parameters
-    initial_guess = [omega_0, 0.4]
+    # Initial guess for parameters (m, k, zeta)
+    initial_guess = (1.0, 1.0, 0.1)
 
     # Perform optimization
-    popt = scipy.optimize.curve_fit(sdof_func, t, y, p0=initial_guess)[0]
+    popt = scipy.optimize.curve_fit(sdof_frf, f, y, p0=initial_guess, bounds=(0, [1000, 1000, 1000]))[0]
 
     # Extract optimized parameters
-    omega_n_optimized, zeta_optimized = popt
+    mass_optimized, stiffness_optimised, zeta_optimized = popt
+    omega_n_optimized = np.sqrt(stiffness_optimised/mass_optimized)
 
     return omega_n_optimized, zeta_optimized
 
 
 if __name__ == '__main__':
     # Specify Sampling frequency
-    Fs = 1000
+    Fs = 100
 
     # import data (and plot)
-    acc = import_data('MDOF_Data.csv', False, Fs, 5)
+    acc = import_data('Accelerations.csv', True, Fs, 10)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = cpsd_matrix(acc, Fs)
 
     # SVD of CPSD-matrix @ each frequency
-    S, U = sv_decomp(mCPSD)
+    S, U, S2, U2, S3, U3 = sv_decomp(mCPSD)
 
-    # Peak-picking (automated for this case)
-    # nPeaks = 3  # maximum number of expected peaks (use number of sensors)
-    # fPeaks, Peaks = aut_peak(vf, S, nPeaks)
-    fPeaks, Peaks, nPeaks = peak_picking(vf, S)
+    # Peak-picking
+    fPeaks, Peaks, nPeaks = peak_picking(vf, S, S2, S3)
 
     # extract mode shape at each peak
     _, mPHI = U.shape
@@ -263,60 +269,42 @@ if __name__ == '__main__':
     fSDOF = np.full((nMAC, nPeaks), np.nan)
     sSDOF = np.full((nMAC, nPeaks), np.nan)
     for i in range(nPeaks):
-        indSDOF = find_widest_range(mac_vec[:, i])
-        fSDOF[indSDOF, i] = vf[indSDOF]
-        sSDOF[indSDOF, i] = S[indSDOF, 0]  # :len(indSDOF[0])
-        fSDOF[:indSDOF[0][0], i] = vf[:indSDOF[0][0]]
-        sSDOF[:indSDOF[0][0], i] = 0
-        fSDOF[indSDOF[0][-1]:len(vf), i] = vf[indSDOF[0][-1]:len(vf)]
-        sSDOF[indSDOF[0][-1]:len(vf), i] = 0
+        indSDOF = find_widest_range(mac_vec[:, i].real, np.where(vf == fPeaks[i])[0])
+        fSDOF[:len(indSDOF), i] = vf[indSDOF]
+        sSDOF[:len(indSDOF), i] = S[indSDOF, 0]
 
     # Plotting the singular values
-    plt.plot(vf, S)
     plt.plot(fPeaks, Peaks, marker='o', linestyle='none')
     for i in range(nPeaks):
-        plt.plot(fSDOF[:, i], sSDOF[:, i])
+        fSDOF_temp_1 = fSDOF[:, i]
+        sSDOF_temp_1 = sSDOF[:, i]
+        fSDOF_temp_2 = fSDOF[~np.isnan(fSDOF_temp_1)]
+        sSDOF_temp_2 = sSDOF[~np.isnan(sSDOF_temp_1)]
+        plt.plot(fSDOF_temp_2, sSDOF_temp_2)
     plt.xlabel('Frequency')
     plt.ylabel('Singular Values')
     plt.title('Singular Value Plot')
     plt.grid(True)
     plt.show()
 
-    # re-transforming SDOFs into time domain
-    ySDOF = np.full(sSDOF.shape, np.nan, dtype=np.complex_)
-    tSDOF = np.full(sSDOF.shape, np.nan)
-    for i in range(nPeaks):
-        y_temp_1 = sSDOF[:, i]
-        y_temp_2 = y_temp_1[~np.isnan(y_temp_1)]
-        y_temp_3 = np.concatenate((y_temp_2, np.flip(y_temp_2)[1:-1]))
-        ySDOF[:len(y_temp_2), i] = np.fft.ifft(y_temp_3)[:len(y_temp_2)]
-        tSDOF[:len(y_temp_2), i] = np.arange(0, len(y_temp_2)) / Fs
-
-    # Fitting SDOF
+    # # Fitting SDOF in frequency domain
     wn = np.zeros((nPeaks, 1))
     zeta = np.zeros((nPeaks, 1))
-    A = np.zeros((nPeaks, 1))
     for i in range(nPeaks):
-        y_temp_4 = ySDOF[:, i].real
-        t_temp_4 = tSDOF[:, i].real
-        y_temp_5 = y_temp_4[~np.isnan(y_temp_4)]
-        t_temp_5 = t_temp_4[~np.isnan(t_temp_4)]
-        x0 = max(y_temp_5)
-        wn[i, :], zeta[i, :] = sdof_fit(y_temp_5, t_temp_5, fPeaks[i])
+        wn[i, :], zeta[i, :] = sdof_frf_fit(sSDOF[:, i], fSDOF[:, i])
 
-    print(wn)
-    print(zeta)
-
-    # Plot Decay of Accelerations of SDOF equivalents and fitted version
+    # Plot Fitted SDOF-Bell-Functions
     # Determine the number of rows and columns
     num_rows = (nPeaks + 1) // 2
     num_cols = 2 if nPeaks > 1 else 1
-    fig, axs = plt.subplots(2, 2, figsize=(10, 8))
+    fig, axs = plt.subplots(num_rows, num_cols, figsize=(10, 8))
     for i in range(nPeaks):
-        x0 = max(ySDOF[:, i].real)
-        ySDOF_fit = sdof_func(tSDOF[:, i], wn[i, :], zeta[i, :])
-        axs[i // num_cols, i % num_cols].plot(tSDOF[:, i], ySDOF[:, i].real)
-        axs[i // num_cols, i % num_cols].plot(tSDOF[:, i], ySDOF_fit)
+        # Frequency vector
+        freq = np.linspace(0, (wn[i, :]+100), 1000)
+        sSDOF_fit = sdof_frf(freq, 1, (wn[i, :]**2), zeta[i, :])
+        scaling_factor = max(sSDOF[:, i])/max(sSDOF_fit)
+        axs[i // num_cols, i % num_cols].plot(fSDOF[:, i], sSDOF[:, i].real)
+        axs[i // num_cols, i % num_cols].plot(freq, sSDOF_fit*scaling_factor)
         axs[i // num_cols, i % num_cols].set_title(f'Subplot {i + 1}')
 
     # Adjust layout
@@ -324,3 +312,7 @@ if __name__ == '__main__':
 
     # Show the plot
     plt.show()
+
+    print(wn/2/np.pi)
+    print(zeta)
+
