@@ -40,17 +40,15 @@ def cpsd_matrix(data, fs):
     # get dimensions
     n_rows, n_cols = data.shape
 
+    # CSPD-Parameters
+    n_per_seg = fs/0.1
+    n_overlap = np.floor(n_per_seg*0.5)
+    window = 'hann'
+
     # preallocate cpsd-matrix and frequency vector
-    n_fft = int(n_rows * 5)  # limit the amount of fft datapoints to increase speed
+    n_fft = int((n_per_seg)/2+1)  # limit the amount of fft datapoints to increase speed
     cpsd = np.zeros((n_cols, n_cols, n_fft), dtype=np.complex_)
     f = np.zeros((n_fft, 1))
-
-    # CSPD-Parameters
-    nperseg = fs/0.01
-    noverlap = np.floor(nperseg*0.5)
-    window = 'hann'
-    print(nperseg)
-    print(noverlap)
 
     # Build cpsd-matrix
     for i in range(n_cols):
@@ -58,11 +56,9 @@ def cpsd_matrix(data, fs):
             f, cpsd[i, j, :] = scipy.signal.csd(data[:, i],
                                                 data[:, j],
                                                 fs=fs,
-                                                detrend=False,
-                                                nperseg=nperseg,
-                                                noverlap=noverlap,
-                                                window=window,
-                                                nfft=n_fft * 2 - 1)
+                                                nperseg=n_per_seg,
+                                                noverlap=n_overlap,
+                                                window=window)
 
     # return cpsd-matrix
     return cpsd, f
@@ -235,7 +231,7 @@ if __name__ == '__main__':
     Fs = 100
 
     # import data (and plot)
-    acc = import_data('Accelerations.csv', True, Fs, 10)
+    acc = import_data('Accelerations.csv', True, Fs, 20)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = cpsd_matrix(acc, Fs)
