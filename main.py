@@ -3,29 +3,28 @@ import csv
 import matplotlib.pyplot as plt
 import scipy
 
-# Global Variables
-global x0
-
 
 # Functions
-def import_data(sFilename, bPlot, fs, time):
-    with open(sFilename, 'r') as f:
+def import_data(filename, plot, fs, time):
+    with open(filename, 'r') as f:
         reader = csv.reader(f)
         data = list(reader)
     data = np.array(data, dtype=float)
-    data = data[:(fs * time), :]
-
+    if time < (data.shape[0]/fs):
+        data = data[:(fs * time), :]
+        t_vec = np.linspace(0, time, time * fs)
+    else:
+        t_vec = np.linspace(0, data.shape[0]/fs, data.shape[0])
     # Some data processing
     n_rows, n_cols = data.shape
     for i in range(n_cols):
         data[:, i] = data[:, i] - np.mean(data[:, i])
 
     # Plot data
-    if bPlot:
+    if plot:
         # Plotting the Data
-        plt.plot(data[:, 0])
-        plt.plot(data[:, 1])
-        plt.plot(data[:, 2])
+        for i in range(n_cols):
+            plt.plot(t_vec, data[:, i])
         plt.xlabel('Time')
         plt.ylabel('Acceleration')
         plt.title('Raw Data')
@@ -41,12 +40,13 @@ def cpsd_matrix(data, fs):
     n_rows, n_cols = data.shape
 
     # CSPD-Parameters
-    n_per_seg = fs/0.1
+    df = fs/n_rows
+    n_per_seg = int(fs/df)
     n_overlap = np.floor(n_per_seg*0.5)
     window = 'hann'
 
     # preallocate cpsd-matrix and frequency vector
-    n_fft = int((n_per_seg)/2+1)  # limit the amount of fft datapoints to increase speed
+    n_fft = int(n_per_seg/2+1)  # limit the amount of fft datapoints to increase speed
     cpsd = np.zeros((n_cols, n_cols, n_fft), dtype=np.complex_)
     f = np.zeros((n_fft, 1))
 
@@ -95,7 +95,7 @@ def peak_picking(x, y, y2, y3):
     y2 = y2.ravel()
     y3 = y3.ravel()
     x = x.ravel()
-    locs, _ = scipy.signal.find_peaks(y)
+    locs, _ = scipy.signal.find_peaks(y, distance=1000)
     y_data = y[locs]
     x_data = x[locs]
 
@@ -126,7 +126,7 @@ def peak_picking(x, y, y2, y3):
             plt.draw()
 
     # Connect the onclick function to the figure
-    cid = figure.canvas.mpl_connect('button_press_event', onclick)
+    _ = figure.canvas.mpl_connect('button_press_event', onclick)
 
     # Plot the blue data points
     ax.plot(x, y)  # Plot the data points in blue
@@ -144,6 +144,8 @@ def peak_picking(x, y, y2, y3):
     ax.set_title('Click to select points')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
+    # Scale Axis
+    # plt.yscale("log")
 
     # Show the plot
     plt.show()
@@ -156,6 +158,7 @@ def peak_picking(x, y, y2, y3):
 
     # Store number of selected points
     n_points = len(selected_points['x'])
+    print(n_points)
 
     return selected_points['x'], selected_points['y'], n_points
 
@@ -230,8 +233,11 @@ if __name__ == '__main__':
     # Specify Sampling frequency
     Fs = 100
 
+    # Threshhold for MAC
+    mac_threshold = 0.97
+
     # import data (and plot)
-    acc = import_data('Accelerations.csv', True, Fs, 20)
+    acc = import_data('Accelerations.csv', False, Fs, 300)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = cpsd_matrix(acc, Fs)
@@ -255,7 +261,7 @@ if __name__ == '__main__':
     for i in range(nPeaks):
         for j in range(nMAC):
             mac = mac_calc(PHI[i, :], U[j, :])
-            if mac.real < 0.85:
+            if mac.real < mac_threshold:
                 mac_vec[j, i] = 0
             else:
                 mac_vec[j, i] = mac
@@ -279,6 +285,7 @@ if __name__ == '__main__':
         plt.plot(fSDOF_temp_2, sSDOF_temp_2)
     plt.xlabel('Frequency')
     plt.ylabel('Singular Values')
+    # plt.yscale("log")
     plt.title('Singular Value Plot')
     plt.grid(True)
     plt.show()
@@ -291,24 +298,25 @@ if __name__ == '__main__':
 
     # Plot Fitted SDOF-Bell-Functions
     # Determine the number of rows and columns
-    num_rows = (nPeaks + 1) // 2
-    num_cols = 2 if nPeaks > 1 else 1
-    fig, axs = plt.subplots(num_rows, num_cols, figsize=(10, 8))
-    for i in range(nPeaks):
-        # Frequency vector
-        freq = np.linspace(0, (wn[i, :]+100), 1000)
-        sSDOF_fit = sdof_frf(freq, 1, (wn[i, :]**2), zeta[i, :])
-        scaling_factor = max(sSDOF[:, i])/max(sSDOF_fit)
-        axs[i // num_cols, i % num_cols].plot(fSDOF[:, i], sSDOF[:, i].real)
-        axs[i // num_cols, i % num_cols].plot(freq, sSDOF_fit*scaling_factor)
-        axs[i // num_cols, i % num_cols].set_title(f'Subplot {i + 1}')
+    if nPeaks != 0:
+        num_rows = (nPeaks + 1) // 2
+        num_cols = 2 if nPeaks > 1 else 1
+        fig, axs = plt.subplots(num_rows, num_cols, figsize=(10, 8))
+        for i in range(nPeaks):
+            # Frequency vector
+            freq = np.linspace(0, (wn[i, :]+100), 1000)
+            sSDOF_fit = sdof_frf(freq, 1, (wn[i, :]**2), zeta[i, :])
+            scaling_factor = max(sSDOF[:, i])/max(sSDOF_fit)
+            axs[i // num_cols, i % num_cols].plot(fSDOF[:, i], sSDOF[:, i].real)
+            axs[i // num_cols, i % num_cols].plot(freq, sSDOF_fit*scaling_factor)
+            axs[i // num_cols, i % num_cols].set_title(f'Subplot {i + 1}')
 
-    # Adjust layout
-    plt.tight_layout()
+        # Adjust layout and log scale axis
+        # plt.yscale("log")
+        plt.tight_layout()
 
-    # Show the plot
-    plt.show()
+        # Show the plot
+        plt.show()
 
     print(wn/2/np.pi)
     print(zeta)
-
