@@ -11,16 +11,16 @@ if __name__ == '__main__':
     mac_threshold = 0.85
 
     # import data (and plot)
-    acc = fdd.import_data('MDOF_Data.csv', False, Fs, 300)
+    acc = fdd.import_data('test_data.csv', False, Fs, 300)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = fdd.cpsd_matrix(acc, Fs)
 
     # SVD of CPSD-matrix @ each frequency
-    S, U, S2, U2, S3, U3 = fdd.sv_decomp(mCPSD)
+    S, U, S2, U2 = fdd.sv_decomp(mCPSD)
 
     # Peak-picking
-    fPeaks, Peaks, nPeaks = fdd.peak_picking(vf, S, S2, S3, Fs)
+    fPeaks, Peaks, nPeaks = fdd.peak_picking(vf, S, S2, Fs)
 
     # extract mode shape at each peak
     _, mPHI = U.shape

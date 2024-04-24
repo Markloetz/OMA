@@ -5,6 +5,11 @@ from matplotlib.widgets import Slider
 import scipy
 
 
+# Global Variables
+class SliderValClass:
+    slider_val = 0
+
+
 # Functions
 def import_data(filename, plot, fs, time):
     with open(filename, 'r') as f:
@@ -86,8 +91,6 @@ def sv_decomp(mat):
     u1 = np.zeros((n_rows, n_cols), dtype=complex)
     s2 = np.zeros((n_rows, 1))
     u2 = np.zeros((n_rows, n_cols), dtype=complex)
-    s3 = np.zeros((n_rows, 1))
-    u3 = np.zeros((n_rows, n_cols), dtype=complex)
 
     # SVD
     for i in range(n_rows):
@@ -96,58 +99,60 @@ def sv_decomp(mat):
         s1[i, :] = s[0]
         u2[i, :] = u[:, 1].transpose()
         s2[i, :] = s[1]
-        u2[i, :] = u[:, 2].transpose()
-        s2[i, :] = s[2]
 
     # return function outputs
-    return s1, u1, s2, u2, s3, u3
+    return s1, u1, s2, u2
 
 
-def peak_picking(x, y, y2, y3, fs):
-    y = y.ravel()
-    y2 = y2.ravel()
-    y3 = y3.ravel()
-    x = x.ravel()
-    min_prominence = 0
-    max_prominence = 10
-    prominence = (min_prominence, None)
-
+def prominence_adjust(x, y, fs):
     # Adjusting peak-prominence with slider
+    min_prominence = 0
+    max_prominence = max(y)
     # Create the plot
-    figure1, ax1 = plt.subplots()
+    figure, ax = plt.subplots()
     plt.subplots_adjust(bottom=0.25)  # Adjust bottom to make space for the slider
 
     # Plot the initial data
-    locs, _ = scipy.signal.find_peaks(y, prominence=prominence, distance=fs/2)
+    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None), distance=fs / 2)
     y_data = y[locs]
     x_data = x[locs]
     # ax1.plot(x, y)
-    line, = ax1.plot(x_data, y_data, 'bo')
+    line, = ax.plot(x_data, y_data, 'bo')
 
     # Add a slider
     ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
     slider = Slider(ax_slider, 'Peak Prominence', min_prominence, max_prominence, valinit=min_prominence)
 
-    # Update Function
+    # Update Plot
     def update(val):
-        locs_, _ = scipy.signal.find_peaks(y, prominence=(slider.val, None), distance=fs/2)
+        SliderValClass.slider_val = val
+        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None), distance=fs / 2)
         y_data_current = y[locs_]
         x_data_current = x[locs_]
         line.set_xdata(x_data_current)
         line.set_ydata(y_data_current)
-        figure1.canvas.draw_idle()
+        figure.canvas.draw_idle()
 
+    print(SliderValClass.slider_val)
     slider.on_changed(update)
-    ax1.plot(x, y)
-    # Update x and y values
-    locs, _ = scipy.signal.find_peaks(y, prominence=(slider.val, None), distance=fs/2)
-    y_data = y[locs]
-    x_data = x[locs]
+    ax.plot(x, y)
     plt.show()
 
+    return SliderValClass.slider_val
+
+
+def peak_picking(x, y, y2, fs):
+    y = y.ravel()
+    y2 = y2.ravel()
+    x = x.ravel()
+
+    # get prominence
+    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y, fs), None), distance=fs / 2)
+    y_data = y[locs]
+    x_data = x[locs]
     # Peak Picking
     # Create a figure and axis
-    figure2, ax2 = plt.subplots()
+    figure, ax = plt.subplots()
 
     # Store the selected points
     selected_points = {'x': [], 'y': []}
@@ -169,28 +174,23 @@ def peak_picking(x, y, y2, y3, fs):
             # Store the selected point
             selected_points['x'].append(nearest_x)
             selected_points['y'].append(nearest_y)
-            ax2.plot(nearest_x, nearest_y, 'ro')  # Plot the selected point in red
+            ax.plot(nearest_x, nearest_y, 'ro')  # Plot the selected point in red
             plt.draw()
 
     # Connect the onclick function to the figure
-    _ = figure2.canvas.mpl_connect('button_press_event', onclick)
+    _ = figure.canvas.mpl_connect('button_press_event', onclick)
 
     # Plot the blue data points
-    ax2.plot(x, y)  # Plot the data points in blue
+    ax.plot(x, y)  # Plot the data points in blue
     if max(y2) <= 0.0001 * max(y):
-        scaling1 = 1
+        scaling = 1
     else:
-        scaling1 = max(y) / max(y2) / 2
-    ax2.plot(x, (y2 * scaling1), linewidth=0.7, color='black')
-    if max(y3) <= 0.0001 * max(y):
-        scaling2 = 1
-    else:
-        scaling2 = max(y) / max(y3) / 2
-    ax2.plot(x, (y3 * scaling2), linewidth=0.7, color='black')
-    ax2.plot(x_data, y_data, 'bo')  # Plot the data points in blue
-    ax2.set_title('Click to select points')
-    ax2.set_xlabel('X')
-    ax2.set_ylabel('Y')
+        scaling = max(y) / max(y2) / 2
+    ax.plot(x, (y2 * scaling), linewidth=0.7, color='black')
+    ax.plot(x_data, y_data, 'bo')  # Plot the data points in blue
+    ax.set_title('Click to select points')
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
 
     # Show the plot
     plt.show()
