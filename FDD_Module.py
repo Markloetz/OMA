@@ -11,7 +11,7 @@ class SliderValClass:
 
 
 # Functions
-def import_data(filename, plot, fs, time):
+def import_data(filename, plot, fs, time, detrend, downsample):
     with open(filename, 'r') as f:
         reader = csv.reader(f)
         data = list(reader)
@@ -21,10 +21,22 @@ def import_data(filename, plot, fs, time):
         t_vec = np.linspace(0, time, time * fs)
     else:
         t_vec = np.linspace(0, data.shape[0] / fs, data.shape[0])
+
     # Some data processing
     n_rows, n_cols = data.shape
-    for i in range(n_cols):
-        data[:, i] = data[:, i] - np.mean(data[:, i])
+    # Detrending
+    if detrend:
+        for i in range(n_cols):
+            data[:, i] = scipy.signal.detrend(data[:, i])
+    # Downsampling
+    fs_new = fs
+    if downsample:
+        q = 2
+        data_new = np.zeros((n_rows//q+1, n_cols))
+        for i in range(n_cols):
+            data_new[:, i] = scipy.signal.decimate(data[:, i], q=q)
+        fs_new = fs//q
+        data = data_new
 
     # Plot data
     if plot:
@@ -38,7 +50,7 @@ def import_data(filename, plot, fs, time):
         plt.show()
 
     # return data
-    return data
+    return data, fs_new
 
 
 def cpsd_matrix(data, fs, zero_padding=True):
@@ -61,7 +73,7 @@ def cpsd_matrix(data, fs, zero_padding=True):
     # CSPD-Parameters (Matlab-Style) -> very good for fitting
     window = 'hamming'
     n_per_seg = np.floor(n_rows / 8)  # divide into 8 segments
-    n_overlap = 0  # Matlab uses zero overlap
+    n_overlap = np.floor(0.5 * n_per_seg)  # Matlab uses zero overlap
 
     # preallocate cpsd-matrix and frequency vector
     n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed
@@ -133,7 +145,6 @@ def prominence_adjust(x, y, fs):
         line.set_ydata(y_data_current)
         figure.canvas.draw_idle()
 
-    print(SliderValClass.slider_val)
     slider.on_changed(update)
     ax.plot(x, y)
     plt.show()
@@ -242,16 +253,19 @@ def find_widest_range(array, center_indices):
 
     # extract indices with maximum length
     max_length_ind = np.argmax(lengths)
-    return group_indices[max_length_ind]
+    out = group_indices[max_length_ind]
+    return out
 
 
-def sdof_frf(f, m, k, zeta):
+def sdof_frf(f, omega, zeta):
+    m = 1
+    k = m * omega ** 2
     omega = 2 * np.pi * f
     h = 1 / (-m * omega ** 2 + 1j * 2 * np.pi * f * zeta * m + k)
     return np.abs(h)
 
 
-def sdof_frf_fit(y, f):
+def sdof_frf_fit(y, f, wn):
     y = y[~np.isnan(y)]
     f = f[~np.isnan(f)]
 
@@ -260,13 +274,76 @@ def sdof_frf_fit(y, f):
     f = f.ravel()
 
     # Initial guess for parameters (m, k, zeta)
-    initial_guess = (1.0, 1.0, 0.01)
+    initial_guess = (wn, 0.01)
 
     # Perform optimization
-    popt = scipy.optimize.curve_fit(sdof_frf, f, y, p0=initial_guess, bounds=([0, 0, 0.001], [1000, 1000, 1000]))[0]
+    popt = scipy.optimize.curve_fit(sdof_frf, f, y, p0=initial_guess, bounds=([0, 0.001], [1000, 1]))[0]
 
     # Extract optimized parameters
-    mass_optimized, stiffness_optimised, zeta_optimized = popt
-    omega_n_optimized = np.sqrt(stiffness_optimised / mass_optimized)
+    omega_n_optimized, zeta_optimized = popt
 
     return omega_n_optimized, zeta_optimized
+
+
+# MergedPowerSpectrum
+def mps(data, fs):
+    # dimensions
+    n_rows, n_cols = data.shape
+
+    if n_cols <= 2:
+        raise ValueError()
+    # MPS calculations
+    window = 'hamming'
+    n_per_seg = np.floor(n_rows / 8)  # divide into 8 segments
+    n_overlap = np.floor(0.5 * n_per_seg)  # Matlab uses zero overlap
+
+    # preallocate cpsd-matrix and frequency vector
+    n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed
+    mps_mat = np.zeros((n_fft, n_cols), dtype=np.complex_)
+    f = np.zeros((n_fft, 1))
+    max_vec = np.zeros((n_cols, 1))
+
+    # The first two mps entries are just the auto spectral densities
+    for i in range(2):
+        f, mps_mat[:, i] = scipy.signal.csd(data[:, i],
+                                            data[:, i],
+                                            fs=fs,
+                                            nperseg=n_per_seg,
+                                            noverlap=n_overlap,
+                                            window=window)
+    for i in range(2, n_cols):
+        _, f_temp_i = scipy.signal.csd(data[:, i],
+                                       data[:, i],
+                                       fs=fs,
+                                       nperseg=n_per_seg,
+                                       noverlap=n_overlap,
+                                       window=window)
+        _, f_temp_i_1 = scipy.signal.csd(data[:, i - 1],
+                                         data[:, i - 1],
+                                         fs=fs,
+                                         nperseg=n_per_seg,
+                                         noverlap=n_overlap,
+                                         window=window)
+        mps_term_1 = np.divide(f_temp_i, f_temp_i_1)
+        mps_mat[:, i] = mps_term_1*mps_mat[:, i - 1]
+        max_vec[i] = np.max(mps_mat[:, i].real)
+    mps_mat = mps_mat / np.max(max_vec)
+    # 3d-plot mps
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot each z-vector as a line at different y positions
+    _, n_mps = mps_mat.shape
+    for i in range(n_mps):
+        ax.plot(f, np.full_like(f, i), mps_mat[:, i].real)
+
+    # Set labels and title
+    ax.set_xlabel('f/Hz')
+    ax.set_ylabel('Position/m')
+    ax.set_zlabel('Spectral Density')
+    ax.set_title('RRNPS')
+
+    # Add legend
+    # plt.legend()
+
+    plt.show()

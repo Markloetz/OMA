@@ -1,35 +1,25 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.widgets import Slider
 
-# Generate some data
-x = np.linspace(0, 10, 100)
-y = np.sin(x)
+# Example data (replace these with your actual data)
+fSDOF = np.random.rand(10, 5)  # Example fSDOF array
+sSDOF = np.random.rand(10, 5)  # Example sSDOF array
+fPeaks = np.random.rand(5)  # Example fPeaks array
+Peaks = np.random.rand(5)  # Example Peaks array
+nPeaks = 5  # Example value of nPeaks
 
-# Create the plot
-fig, ax = plt.subplots()
-plt.subplots_adjust(bottom=0.25)  # Adjust bottom to make space for the slider
+# Plotting the singular values
+for i in range(nPeaks):
+    fSDOF_temp_1 = fSDOF[:, i]
+    sSDOF_temp_1 = sSDOF[:, i]
+    fSDOF_temp_2 = fSDOF_temp_1[~np.isnan(fSDOF_temp_1)]
+    sSDOF_temp_2 = sSDOF_temp_1[~np.isnan(sSDOF_temp_1)]
+    color = ((nPeaks - i) / nPeaks, (i + 1) / nPeaks, 0.5, 1)
+    plt.plot(fSDOF_temp_2, sSDOF_temp_2, color=color)
 
-# Plot the initial data
-line, = ax.plot(x, y)
-
-# Add a slider
-ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
-slider = Slider(ax_slider, 'Freq', 0.1, 10.0, valinit=1)
-
-# Variable to store slider value
-slider_value = slider.val
-
-# Update function for the slider
-def update(val):
-    global slider_value  # Declare slider_value as global so we can modify it
-    slider_value = val
-    line.set_ydata(np.sin(slider_value * x))
-    fig.canvas.draw_idle()
-
-slider.on_changed(update)
-
+plt.plot(fPeaks, Peaks, marker='o', linestyle='none')
+plt.xlabel('Frequency')
+plt.ylabel('Singular Values')
+plt.title('Singular Value Plot')
+plt.grid(True)
 plt.show()
-
-# Now you can use slider_value elsewhere in your code
-print("Slider value:", slider_value)
