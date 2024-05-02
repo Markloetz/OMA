@@ -1,32 +1,93 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import nidaqmx
-from nidaqmx.constants import (AcquisitionType, AccelSensitivityUnits, AccelUnits)
-import csv
+from nidaqmx.constants import (AcquisitionType, AccelSensitivityUnits, AccelUnits, FuncGenType)
+from scipy.signal import butter, filtfilt
 
 
-def record_iepe_data(device, channels, duration, fs, sensitivities):
-    with nidaqmx.Task() as task:
+def generate_bandlimited_white_noise(duration, sample_rate, freq=500, ramp_duration=2):
+    num_samples = int(duration * sample_rate)
+    t = np.arange(num_samples) / sample_rate
+
+    # Generate white noise
+    white_noise = np.random.randn(num_samples)
+
+    # Create Lowpass filter
+    nyquist = 0.5 * sample_rate
+    cut = freq / nyquist
+    2 * cut / sample_rate
+    b, a = butter(4, cut, btype='lowpass', fs=sample_rate)
+
+    # Apply filter to white noise
+    filtered_noise = filtfilt(b, a, white_noise)
+
+    # Apply ramp up and ramp down
+    ramp_up_samples = int(ramp_duration * sample_rate)
+    ramp_down_samples = int(ramp_duration * sample_rate)
+    ramp_up = np.linspace(0, 1, ramp_up_samples)
+    ramp_down = np.linspace(1, 0, ramp_down_samples)
+
+    amplitude_ramp = np.ones(num_samples)
+    amplitude_ramp[:ramp_up_samples] = ramp_up
+    amplitude_ramp[-ramp_down_samples:] = ramp_down
+
+    return filtered_noise * amplitude_ramp
+
+
+def daq_oma(device_in, device_out, device_force, channels, duration, fs, acc_sensitivities, force_sensitivity):
+    with nidaqmx.Task() as acc_task, nidaqmx.Task() as out_task, nidaqmx.Task() as force_task:
+        # Configure IEPE task
         for channel in channels:
-            task.ai_channels.add_ai_accel_chan(f"{device}/ai{channel}",
-                                               sensitivity=1,
-                                               units=AccelUnits.G,
-                                               current_excit_val=0.002,
-                                               sensitivity_units=AccelSensitivityUnits.MILLIVOLTS_PER_G)
-        task.timing.cfg_samp_clk_timing(rate=fs,
-                                        sample_mode=AcquisitionType.FINITE,
-                                        samps_per_chan=duration * fs)
-        # record data
-        task.start()
-        data = task.read(number_of_samples_per_channel=duration * fs, timeout=duration)
-        task.stop()
+            acc_task.ai_channels.add_ai_accel_chan(f"{device_in}/ai{channel}",
+                                                   sensitivity=1,
+                                                   units=AccelUnits.G,
+                                                   current_excit_val=0.002,
+                                                   sensitivity_units=AccelSensitivityUnits.MILLIVOLTS_PER_G)
+        acc_task.timing.cfg_samp_clk_timing(rate=fs,
+                                            sample_mode=AcquisitionType.FINITE,
+                                            samps_per_chan=(duration + 4) * fs)
+        # Configure Shaker task
+        out_task.ao_channels.add_ao_voltage_chan(f"{device_out}/ao0")
+        out_task.timing.cfg_samp_clk_timing(rate=fs)
+
+        # Configure Force measurement
+        force_task.ai_channels.add_ai_force_iepe_chan(f"{device_force}/ai0",
+                                                      sensitivity=1,
+                                                      current_excit_val=0.002)
+        force_task.timing.cfg_samp_clk_timing(rate=fs,
+                                              sample_mode=AcquisitionType.FINITE,
+                                              samps_per_chan=(duration + 4) * fs)
+
+        # Generate white noise vector
+        white_noise = generate_bandlimited_white_noise(duration=duration + 4, sample_rate=fs, freq=fs / 2)
+
+        # Start Analog Output
+        out_task.write(white_noise * 10, timeout=duration + 4)
+        out_task.start()
+
+        # record accelerations
+        acc_task.start()
+        acc_data = acc_task.read(number_of_samples_per_channel=(duration + 4) * fs, timeout=duration + 4)
+
+        # record accelerations
+        force_task.start()
+        force_data = force_task.read(number_of_samples_per_channel=(duration + 4) * fs, timeout=duration + 4)
+
+        # Stop everything
+        out_task.stop()
+        acc_task.stop()
+        force_task.stop()
 
         # Convert to numpy array
-        data = np.array(data)
-        data = data.transpose()
+        acc_data = np.array(acc_data)
+        force_data = np.array(force_data)
+        acc_data = acc_data.transpose()
+        force_data = force_data.transpose()
+        force_data_out = force_data[(2*sample_rate):-(2*sample_rate)] / force_sensitivity
+        acc_data_out = np.zeros((duration*sample_rate, len(channels)))
         for channel in channels:
-            data[:, channel] = data[:, channel]/sensitivities[channel]
-    return data
+            acc_data_out[:, channel] = acc_data[(2*sample_rate):-(2*sample_rate), channel] / acc_sensitivities[channel]
+    return acc_data_out, force_data_out
 
 
 def plot_data(data, sample_rate):
@@ -46,17 +107,23 @@ def save_to_csv(data, filename):
 
 
 if __name__ == "__main__":
-    device = "cDAQ1Mod1"
+    device_in = "cDAQ9189-1CDF2BFMod2"
+    device_out = "cDAQ9189-1CDF2BFMod1"
+    device_force = "cDAQ9189-1CDF2BFMod3"
     channels = [0, 1]
-    sensitivities = [1039.0, 1058.2] # mv/ms^-2
-    duration = 300
+    sensitivities = [1039.0, 1058.2]  # mv/ms^-2
+    force_sensitivity = 1
+    duration = 30
     sample_rate = 1000
     csv_filename = "test_data.csv"
 
-    data = record_iepe_data(device=device,
-                            channels=channels,
-                            duration=duration,
-                            fs=sample_rate,
-                            sensitivities=sensitivities)
-    save_to_csv(data, csv_filename)
-    plot_data(data, sample_rate)
+    acc_data, force_data = daq_oma(device_in=device_in,
+                                   device_out=device_out,
+                                   device_force=device_force,
+                                   channels=channels,
+                                   duration=duration,
+                                   fs=sample_rate,
+                                   acc_sensitivities=sensitivities,
+                                   force_sensitivity=force_sensitivity)
+    save_to_csv(acc_data, csv_filename)
+    plot_data(acc_data, sample_rate)
