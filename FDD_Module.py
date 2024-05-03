@@ -380,36 +380,21 @@ def plot_fit(fSDOF, sSDOF, wn, zeta):
 
 
 def sdof_cf(f, TF, Fmin=None, Fmax=None):
+    # Eliminate nan
     f = f[~np.isnan(f)]
     TF = TF[~np.isnan(TF)]
 
-    print(TF)
-    print(f)
-    # check fmin fmax existance
-    if Fmin is None:
-        inlow = 0
-    else:
-        inlow = Fmin
-
-    if Fmax is None:
-        inhigh = np.size(f)
-    else:
-        inhigh = Fmax
-
-    if f[inlow] == 0:
-        inlow = 1
-
-    f = f[inlow:inhigh]
-    TF = TF[inlow:inhigh]
-
+    # get index of maximum
     R = TF
-    y = np.amax(np.abs(TF))
     cin = np.argmax(np.abs(TF))
 
+    # length of the dataset
     ll = np.size(f)
 
+    # convert to rad/s and multiply with imag
     w = f * 2 * np.pi * 1j
 
+    #
     w2 = w * 0
     R3 = R * 0
 
@@ -434,6 +419,9 @@ def sdof_cf(f, TF, Fmin=None, Fmax=None):
 
     aa = np.reshape(aa, [-1, 5])
 
+    print(aa.shape)
+    print(c.shape)
+
     b, _, _, _ = scipy.linalg.lstsq(aa, c)
 
     b = b.flatten()
@@ -456,33 +444,13 @@ def sdof_cf(f, TF, Fmin=None, Fmax=None):
 
     a = np.sqrt(-2 * np.imag(a[0]) * np.imag(rs[0])
                 - 2 * np.real(a[0]) * np.real(rs[0]))
-    Fmin = np.min(f)
-    Fmax = np.max(f)
+
     phase = np.unwrap(np.angle(TF), np.pi, 0) * 180 / np.pi
     phase2 = np.unwrap(np.angle(XoF), np.pi, 0) * 180 / np.pi
     while phase2[cin] > 50:
         phase2 = phase2 - 360
     phased = phase2[cin] - phase[cin]
     phase = phase + np.round(phased / 360) * 360
-
-    fig = plt.figure()
-    ax1 = fig.add_subplot(2, 1, 1)
-    ax2 = fig.add_subplot(2, 1, 2)
-    fig.tight_layout()
-
-    ax1.set_xlabel('Frequency (Hz)')
-    ax1.set_ylabel('Magnitude (dB)')
-    ax1.plot(f, 20 * np.log10(np.abs(XoF)), label="Identified FRF")
-    ax1.plot(f, 20 * np.log10(np.abs(TF)), label="Experimental FRF")
-    ax1.legend()
-
-    ax2.set_xlabel('Frequency (Hz)')
-    ax2.set_ylabel('Phase (deg)')
-    ax2.plot(f, phase2, label="Identified FRF")
-    ax2.plot(f, phase, label="Experimental FRF")
-    ax2.legend()
-
-    plt.show()
 
     a = a[0]**2 / (2 * np.pi * nf)**2
     return z, nf, a

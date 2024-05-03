@@ -5,18 +5,18 @@ from nidaqmx.constants import (AcquisitionType, AccelSensitivityUnits, AccelUnit
 from scipy.signal import butter, filtfilt
 
 
-def generate_bandlimited_white_noise(duration, sample_rate, freq=500, ramp_duration=2):
+def generate_bandlimited_white_noise(duration, sample_rate, cut_freq=500, ramp_duration=2):
     num_samples = int(duration * sample_rate)
-    t = np.arange(num_samples) / sample_rate
 
     # Generate white noise
-    white_noise = np.random.randn(num_samples)
+    white_noise = np.random.standard_normal(num_samples)
+    white_noise = white_noise/max(np.abs(white_noise))
 
     # Create Lowpass filter
     nyquist = 0.5 * sample_rate
-    cut = freq / nyquist
-    2 * cut / sample_rate
-    b, a = butter(4, cut, btype='lowpass', fs=sample_rate)
+    if cut_freq >= nyquist:
+        cut_freq = nyquist-1
+    b, a = butter(4, cut_freq, btype='low', fs=sample_rate, analog=False)
 
     # Apply filter to white noise
     filtered_noise = filtfilt(b, a, white_noise)
@@ -59,7 +59,7 @@ def daq_oma(device_in, device_out, device_force, channels, duration, fs, acc_sen
                                               samps_per_chan=(duration + 4) * fs)
 
         # Generate white noise vector
-        white_noise = generate_bandlimited_white_noise(duration=duration + 4, sample_rate=fs, freq=fs / 2)
+        white_noise = generate_bandlimited_white_noise(duration=duration + 4, sample_rate=fs)
 
         # Start Analog Output
         out_task.write(white_noise * 10, timeout=duration + 4)
