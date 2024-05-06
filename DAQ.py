@@ -1,11 +1,12 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import nidaqmx
-from nidaqmx.constants import (AcquisitionType, AccelSensitivityUnits, AccelUnits, FuncGenType)
+from nidaqmx.constants import (AcquisitionType, AccelSensitivityUnits, AccelUnits)
 from scipy.signal import butter, filtfilt
+import nidaqmx.stream_writers
 
 
-def generate_bandlimited_white_noise(duration, sample_rate, cut_freq=500, ramp_duration=2):
+def generate_bandlimited_white_noise(duration, sample_rate, cut_low=5, cut_high=500, ramp_duration=2):
     num_samples = int(duration * sample_rate)
 
     # Generate white noise
@@ -14,9 +15,9 @@ def generate_bandlimited_white_noise(duration, sample_rate, cut_freq=500, ramp_d
 
     # Create Lowpass filter
     nyquist = 0.5 * sample_rate
-    if cut_freq >= nyquist:
-        cut_freq = nyquist-1
-    b, a = butter(4, cut_freq, btype='low', fs=sample_rate, analog=False)
+    if cut_high >= nyquist:
+        cut_high = nyquist-1
+    b, a = butter(4, [cut_low, cut_high], btype='bandpass', fs=sample_rate, analog=False)
 
     # Apply filter to white noise
     filtered_noise = filtfilt(b, a, white_noise)
@@ -34,6 +35,21 @@ def generate_bandlimited_white_noise(duration, sample_rate, cut_freq=500, ramp_d
     return filtered_noise * amplitude_ramp
 
 
+def sine_gen(duration, sample_rate):
+    t = np.linspace(0, duration, duration*sample_rate)
+    sine = np.sin(2 * np.pi * 10 * t)
+    # Apply ramp up and ramp down
+    ramp_up_samples = int(2 * sample_rate)
+    ramp_down_samples = int(2 * sample_rate)
+    ramp_up = np.linspace(0, 1, ramp_up_samples)
+    ramp_down = np.linspace(1, 0, ramp_down_samples)
+
+    amplitude_ramp = np.ones(int(duration * sample_rate))
+    amplitude_ramp[:ramp_up_samples] = ramp_up
+    amplitude_ramp[-ramp_down_samples:] = ramp_down
+    return sine*amplitude_ramp
+
+
 def daq_oma(device_in, device_out, device_force, channels, duration, fs, acc_sensitivities, force_sensitivity):
     with nidaqmx.Task() as acc_task, nidaqmx.Task() as out_task, nidaqmx.Task() as force_task:
         # Configure IEPE task
@@ -48,7 +64,10 @@ def daq_oma(device_in, device_out, device_force, channels, duration, fs, acc_sen
                                             samps_per_chan=(duration + 4) * fs)
         # Configure Shaker task
         out_task.ao_channels.add_ao_voltage_chan(f"{device_out}/ao0")
-        out_task.timing.cfg_samp_clk_timing(rate=fs)
+        out_task.timing.cfg_samp_clk_timing(rate=fs,
+                                            sample_mode=AcquisitionType.FINITE,
+                                            samps_per_chan=(duration + 4) * fs)
+        writer = nidaqmx.stream_writers.AnalogSingleChannelWriter(out_task.out_stream, auto_start=True)
 
         # Configure Force measurement
         force_task.ai_channels.add_ai_force_iepe_chan(f"{device_force}/ai0",
@@ -59,11 +78,17 @@ def daq_oma(device_in, device_out, device_force, channels, duration, fs, acc_sen
                                               samps_per_chan=(duration + 4) * fs)
 
         # Generate white noise vector
-        white_noise = generate_bandlimited_white_noise(duration=duration + 4, sample_rate=fs)
+        white_noise = generate_bandlimited_white_noise(duration=duration + 4,
+                                                       sample_rate=fs,
+                                                       cut_low=5,
+                                                       cut_high=150)
+        sine = sine_gen(duration+4, sample_rate=fs)
 
         # Start Analog Output
-        out_task.write(white_noise * 10, timeout=duration + 4)
-        out_task.start()
+        # out_task.start()
+        # out_task.write(white_noise * 10, timeout=duration + 4)
+        writer.write_many_sample(white_noise*5, timeout=duration+4)
+        # out_task.wait_until_done()
 
         # record accelerations
         acc_task.start()
@@ -86,7 +111,7 @@ def daq_oma(device_in, device_out, device_force, channels, duration, fs, acc_sen
         force_data_out = force_data[(2*sample_rate):-(2*sample_rate)] / force_sensitivity
         acc_data_out = np.zeros((duration*sample_rate, len(channels)))
         for channel in channels:
-            acc_data_out[:, channel] = acc_data[(2*sample_rate):-(2*sample_rate), channel] / acc_sensitivities[channel]
+            acc_data_out[:, channel] = acc_data[(2*sample_rate):-(2*sample_rate), channel] / 1000 / acc_sensitivities[channel]
     return acc_data_out, force_data_out
 
 
@@ -111,11 +136,11 @@ if __name__ == "__main__":
     device_out = "cDAQ9189-1CDF2BFMod1"
     device_force = "cDAQ9189-1CDF2BFMod3"
     channels = [0, 1]
-    sensitivities = [1039.0, 1058.2]  # mv/ms^-2
+    sensitivities = [1.008, 1.060]  # mv/ms^-2
     force_sensitivity = 1
-    duration = 30
+    duration = 60
     sample_rate = 1000
-    csv_filename = "test_data.csv"
+    csv_filename = "acc_data_030524.csv"
 
     acc_data, force_data = daq_oma(device_in=device_in,
                                    device_out=device_out,

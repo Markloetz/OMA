@@ -31,7 +31,7 @@ def import_data(filename, plot, fs, time, detrend, downsample):
     fs_new = fs
     if downsample:
         q = 2
-        data_new = np.zeros((n_rows // q + 1, n_cols))
+        data_new = np.zeros((n_rows // q, n_cols))
         for i in range(n_cols):
             data_new[:, i] = scipy.signal.decimate(data[:, i], q=q)
         fs_new = fs // q
@@ -117,14 +117,14 @@ def sv_decomp(mat):
 
 def prominence_adjust(x, y, fs):
     # Adjusting peak-prominence with slider
-    min_prominence = 0
+    min_prominence = -max(y)
     max_prominence = max(y)
     # Create the plot
     figure, ax = plt.subplots()
     plt.subplots_adjust(bottom=0.25)  # Adjust bottom to make space for the slider
 
     # Plot the initial data
-    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None), distance=fs / 2)
+    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None))
     y_data = y[locs]
     x_data = x[locs]
     # ax1.plot(x, y)
@@ -137,7 +137,7 @@ def prominence_adjust(x, y, fs):
     # Update Plot
     def update(val):
         SliderValClass.slider_val = val
-        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None), distance=fs / 2)
+        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None))
         y_data_current = y[locs_]
         x_data_current = x[locs_]
         line.set_xdata(x_data_current)
@@ -157,7 +157,7 @@ def peak_picking(x, y, y2, fs, n_sval=1):
     x = x.ravel()
 
     # get prominence
-    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y, fs), None), distance=fs / 2)
+    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y, fs), None))
     y_data = y[locs]
     x_data = x[locs]
     # Peak Picking

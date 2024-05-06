@@ -12,10 +12,10 @@ if __name__ == '__main__':
     mac_threshold = 0.85
 
     # import data (and plot)
-    acc, Fs = fdd.import_data('MDOF_Data.csv', False, Fs, 300, False, False)
+    acc, Fs = fdd.import_data('Accelerations.csv', False, Fs, 60, False, True)
 
     # Build CPSD-Matrix from acceleration data
-    mCPSD, vf = fdd.cpsd_matrix(acc, Fs)
+    mCPSD, vf = fdd.cpsd_matrix(acc, Fs, zero_padding=False)
 
     # SVD of CPSD-matrix @ each frequency
     S, U, S2, U2 = fdd.sv_decomp(mCPSD)
@@ -75,7 +75,7 @@ if __name__ == '__main__':
     plt.show()
 
     # Print natural frquencies from svd
-    # print(fPeaks)
+    print(fPeaks)
 
     # Fitting SDOF in frequency domain
     wn = np.zeros((nPeaks, 1))
