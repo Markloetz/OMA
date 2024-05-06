@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 import scipy
 
+
 # Global Variables
 class SliderValClass:
     slider_val = 0
@@ -58,7 +59,7 @@ def cpsd_matrix(data, fs, zero_padding=True):
 
     # Zero padding
     if zero_padding:
-        n_padding = 2
+        n_padding = 5
         buffer = np.zeros((n_rows * n_padding, n_cols))
         buffer[:n_rows, :] = data
         data = buffer
@@ -72,7 +73,7 @@ def cpsd_matrix(data, fs, zero_padding=True):
     # CSPD-Parameters (Matlab-Style) -> very good for fitting
     window = 'hamming'
     n_per_seg = np.floor(n_rows / 8)  # divide into 8 segments
-    n_overlap = np.floor(0.5 * n_per_seg)  # Matlab uses zero overlap
+    n_overlap = np.floor(0.9 * n_per_seg)  # Matlab uses zero overlap
 
     # preallocate cpsd-matrix and frequency vector
     n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed
@@ -93,7 +94,7 @@ def cpsd_matrix(data, fs, zero_padding=True):
     return cpsd, f
 
 
-def sv_decomp(mat):
+def sv_decomp(mat, smooth=False):
     # get dimensions
     n_cols, _, n_rows = mat.shape
 
@@ -115,9 +116,13 @@ def sv_decomp(mat):
     return s1, u1, s2, u2
 
 
-def prominence_adjust(x, y, fs):
+def smooth(data):
+    return scipy.signal.savgol_filter(data, data.shape[0] // 100, 3)
+
+
+def prominence_adjust(x, y):
     # Adjusting peak-prominence with slider
-    min_prominence = -max(y)
+    min_prominence = 0
     max_prominence = max(y)
     # Create the plot
     figure, ax = plt.subplots()
@@ -157,7 +162,7 @@ def peak_picking(x, y, y2, fs, n_sval=1):
     x = x.ravel()
 
     # get prominence
-    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y, fs), None))
+    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y), None))
     y_data = y[locs]
     x_data = x[locs]
     # Peak Picking
@@ -408,13 +413,13 @@ def sdof_cf(f, TF, Fmin=None, Fmax=None):
     N = 2
     x, y = np.meshgrid(np.arange(0, N + 1), R)
     x, w2d = np.meshgrid(np.arange(0, N + 1), w)
-    c = -1 * w**N * R
+    c = -1 * w ** N * R
 
     aa1 = w2d[:, np.arange(0, N)] \
-        ** x[:, np.arange(0, N)] \
-        * y[:, np.arange(0, N)]
+          ** x[:, np.arange(0, N)] \
+          * y[:, np.arange(0, N)]
     aa2 = -w2d[:, np.arange(0, N + 1)] \
-        ** x[:, np.arange(0, N + 1)]
+           ** x[:, np.arange(0, N + 1)]
     aa = np.hstack((aa1, aa2))
 
     aa = np.reshape(aa, [-1, 5])
@@ -433,8 +438,8 @@ def sdof_cf(f, TF, Fmin=None, Fmax=None):
     nf = omega / 2 / np.pi
 
     XoF1 = np.hstack(([1 / (w - rs[0]), 1 / (w - rs[1])]))
-    XoF2 = 1 / (w**0)
-    XoF3 = 1 / w**2
+    XoF2 = 1 / (w ** 0)
+    XoF3 = 1 / w ** 2
     XoF = np.hstack((XoF1, XoF2, XoF3))
 
     # check if extra _ needed
@@ -452,5 +457,23 @@ def sdof_cf(f, TF, Fmin=None, Fmax=None):
     phased = phase2[cin] - phase[cin]
     phase = phase + np.round(phased / 360) * 360
 
-    a = a[0]**2 / (2 * np.pi * nf)**2
+    a = a[0] ** 2 / (2 * np.pi * nf) ** 2
     return z, nf, a
+
+
+def sdof_half_power(f, y, fn):
+    # removing nan
+    f = f[~np.isnan(f)]
+    y = y[~np.isnan(y)]
+
+    # Applying the half power method to estimeate the damping coefficients
+    # extract peak value and the half power value
+    y_wn = y[np.where(f == fn)]
+    threshold = 0.707 * y_wn
+    # find the range north of the threshold
+    ind_range = np.where(y >= threshold)[0]
+    ind_high = ind_range[-1]
+    ind_low = ind_range[0]
+    delta_f = f[ind_high] - f[ind_low]
+    zeta_est = delta_f / 2 / fn
+    return fn * 2 * np.pi, zeta_est

@@ -138,9 +138,10 @@ if __name__ == "__main__":
     channels = [0, 1]
     sensitivities = [1.008, 1.060]  # mv/ms^-2
     force_sensitivity = 1
-    duration = 60
+    duration = 30
     sample_rate = 1000
-    csv_filename = "acc_data_030524.csv"
+    csv_filename = "Hammer.csv"
+    force_filename = "force_data_disgard.csv"
 
     acc_data, force_data = daq_oma(device_in=device_in,
                                    device_out=device_out,
@@ -151,4 +152,5 @@ if __name__ == "__main__":
                                    acc_sensitivities=sensitivities,
                                    force_sensitivity=force_sensitivity)
     save_to_csv(acc_data, csv_filename)
+    save_to_csv(force_data, force_filename)
     plot_data(acc_data, sample_rate)

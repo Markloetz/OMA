@@ -12,10 +12,17 @@ if __name__ == '__main__':
     mac_threshold = 0.85
 
     # import data (and plot)
-    acc, Fs = fdd.import_data('Accelerations.csv', False, Fs, 60, False, True)
+    acc, Fs = fdd.import_data(filename='acc_total_060524.csv',
+                              plot=False,
+                              fs=Fs,
+                              time=60,
+                              detrend=False,
+                              downsample=False)
 
     # Build CPSD-Matrix from acceleration data
-    mCPSD, vf = fdd.cpsd_matrix(acc, Fs, zero_padding=False)
+    mCPSD, vf = fdd.cpsd_matrix(data=acc,
+                                fs=Fs,
+                                zero_padding=False)
 
     # SVD of CPSD-matrix @ each frequency
     S, U, S2, U2 = fdd.sv_decomp(mCPSD)
@@ -82,7 +89,8 @@ if __name__ == '__main__':
     zeta = np.zeros((nPeaks, 1))
     for i in range(nPeaks):
         # wn[i, :], zeta[i, :] = fdd.sdof_frf_fit(sSDOF[:, i], fSDOF[:, i], fPeaks[i])
-        wn[i, :], zeta[i, :], _ = fdd.sdof_cf(fSDOF[:, i], sSDOF[:, i])
+        # wn[i, :], zeta[i, :], _ = fdd.sdof_cf(fSDOF[:, i], sSDOF[:, i])
+        wn[i, :], zeta[i, :] = fdd.sdof_half_power(fSDOF[:, i], sSDOF[:, i], fPeaks[i])
     # Print Damping and natural frequencies
     print(wn/2/np.pi)
     print(zeta)
