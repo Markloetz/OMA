@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
     Fs = 1000
-    signal, _ = fdd.import_data(filename='Hammer.csv',
+    signal, _ = fdd.import_data(filename='Data/Hammer.csv',
                                 plot=True,
                                 fs=Fs,
                                 time=60,

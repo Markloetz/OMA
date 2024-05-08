@@ -144,7 +144,6 @@ def prominence_adjust(x, y):
     locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None))
     y_data = y[locs]
     x_data = x[locs]
-    # ax1.plot(x, y)
     line, = ax.plot(x_data, y_data, 'bo')
 
     # Add a slider
@@ -163,6 +162,7 @@ def prominence_adjust(x, y):
 
     slider.on_changed(update)
     ax.plot(x, y)
+    ax.set_xlim([0, 100])
     plt.show()
 
     return SliderValClass.slider_val
@@ -180,6 +180,7 @@ def peak_picking(x, y, y2, fs, n_sval=1):
     # Peak Picking
     # Create a figure and axis
     figure, ax = plt.subplots()
+    ax.set_xlim([0, 100])
 
     # Store the selected points
     selected_points = {'x': [], 'y': []}

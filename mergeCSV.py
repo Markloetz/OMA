@@ -7,55 +7,55 @@ def save_to_csv(data, filename):
 
 if __name__ == "__main__":
     Fs = 1000
-    acc1, _ = fdd.import_data(filename='acc_data_050524_12.csv',
+    acc1, _ = fdd.import_data(filename='Data/ShakerTest/acc_data_050524_12.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
                               detrend=False,
                               downsample=False)
-    acc2, _ = fdd.import_data(filename='acc_data_050524_34.csv',
+    acc2, _ = fdd.import_data(filename='Data/ShakerTest/acc_data_050524_34.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
                               detrend=False,
                               downsample=False)
-    acc3, _ = fdd.import_data(filename='acc_data_050524_56.csv',
+    acc3, _ = fdd.import_data(filename='Data/ShakerTest/acc_data_050524_56.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
                               detrend=False,
                               downsample=False)
-    acc4, _ = fdd.import_data(filename='acc_data_050524_78.csv',
+    acc4, _ = fdd.import_data(filename='Data/ShakerTest/acc_data_050524_78.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
                               detrend=False,
                               downsample=False)
-    acc5, _ = fdd.import_data(filename='acc_data_050524_910.csv',
+    acc5, _ = fdd.import_data(filename='Data/ShakerTest/acc_data_050524_910.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
                               detrend=False,
                               downsample=False)
-    acc6, _ = fdd.import_data(filename='acc_data_050524_1112.csv',
+    acc6, _ = fdd.import_data(filename='Data/ShakerTest/acc_data_050524_1112.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
                               detrend=False,
                               downsample=False)
-    acc7, _ = fdd.import_data(filename='acc_data_050524_1314.csv',
+    acc7, _ = fdd.import_data(filename='Data/ShakerTest/acc_data_050524_1314.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
                               detrend=False,
                               downsample=False)
-    acc8, _ = fdd.import_data(filename='acc_data_050524_1516.csv',
+    acc8, _ = fdd.import_data(filename='Data/ShakerTest/acc_data_050524_1516.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
                               detrend=False,
                               downsample=False)
-    acc9, _ = fdd.import_data(filename='acc_data_050524_1718.csv',
+    acc9, _ = fdd.import_data(filename='Data/ShakerTest/acc_data_050524_1718.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
@@ -74,5 +74,5 @@ if __name__ == "__main__":
     acc_tot[:, 14:16] = acc8
     acc_tot[:, 16:18] = acc9
 
-    save_to_csv(acc_tot, "acc_total_060524.csv")
+    save_to_csv(acc_tot, "Data/ShakerTest/acc_total_060524.csv")
 

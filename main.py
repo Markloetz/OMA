@@ -9,16 +9,16 @@ if __name__ == '__main__':
     Fs = 1000
 
     # Threshold for MAC
-    mac_threshold = 0.4
+    mac_threshold = 0.9
 
     # import data (and plot)
-    acc, Fs = fdd.import_data(filename='acc_total_060524.csv',
+    acc, Fs = fdd.import_data(filename='Data/acc_data_080524_total.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
-                              detrend=True,
+                              detrend=False,
                               downsample=False,
-                              gausscheck = True)
+                              gausscheck=False)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = fdd.cpsd_matrix(data=acc,
@@ -93,7 +93,7 @@ if __name__ == '__main__':
         # wn[i, :], zeta[i, :], _ = fdd.sdof_cf(fSDOF[:, i], sSDOF[:, i])
         wn[i, :], zeta[i, :] = fdd.sdof_half_power(fSDOF[:, i], sSDOF[:, i], fPeaks[i])
     # Print Damping and natural frequencies
-    print(wn/2/np.pi)
+    print(wn / 2 / np.pi)
     print(zeta)
 
     # Plot Fitted SDOF-Bell Functions
