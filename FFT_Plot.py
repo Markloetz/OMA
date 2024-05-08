@@ -5,19 +5,20 @@ import matplotlib.pyplot as plt
 if __name__ == "__main__":
     Fs = 1000
     signal, _ = fdd.import_data(filename='Hammer.csv',
-                                plot=False,
+                                plot=True,
                                 fs=Fs,
                                 time=60,
                                 detrend=False,
                                 downsample=False)
 
     # Generate some sample data
-    fs = 1000  # Sampling frequency
+    data = signal[:, 0]
 
+    signal = data
     # Perform FFT
     fft_output = np.fft.fft(signal)
     spec = fft_output[:(len(fft_output)//2)]
-    frequencies = np.fft.fftfreq(len(signal), 1 / fs)
+    frequencies = np.fft.fftfreq(len(signal), 1 / Fs)
     f = frequencies[:(len(frequencies) // 2)]
 
     # Plot the FFT

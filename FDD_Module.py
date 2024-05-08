@@ -11,7 +11,7 @@ class SliderValClass:
 
 
 # Functions
-def import_data(filename, plot, fs, time, detrend, downsample):
+def import_data(filename, plot, fs, time, detrend, downsample, gausscheck):
     with open(filename, 'r') as f:
         reader = csv.reader(f)
         data = list(reader)
@@ -49,6 +49,18 @@ def import_data(filename, plot, fs, time, detrend, downsample):
         plt.grid(True)
         plt.show()
 
+    if gausscheck:
+        # split measurement into 10 segments
+        n_seg = 10
+        alpha = 0.05
+        for i in range(n_cols):
+            for j in range(n_seg):
+                data_temp = data[j*n_rows//n_seg:(j*n_rows//n_seg+n_rows//n_seg), i]
+                # check for normality of the signal with shapiro-wilk-test
+                _, p_val = scipy.stats.shapiro(data_temp)
+                if p_val > alpha:
+                    print(p_val)
+
     # return data
     return data, fs_new
 
@@ -73,7 +85,7 @@ def cpsd_matrix(data, fs, zero_padding=True):
     # CSPD-Parameters (Matlab-Style) -> very good for fitting
     window = 'hamming'
     n_per_seg = np.floor(n_rows / 8)  # divide into 8 segments
-    n_overlap = np.floor(0.9 * n_per_seg)  # Matlab uses zero overlap
+    n_overlap = np.floor(0 * n_per_seg)  # Matlab uses zero overlap
 
     # preallocate cpsd-matrix and frequency vector
     n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed
