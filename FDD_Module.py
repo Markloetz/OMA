@@ -11,7 +11,7 @@ class SliderValClass:
 
 
 # Functions
-def import_data(filename, plot, fs, time, detrend, downsample, gausscheck):
+def import_data(filename, plot, fs, time, detrend, downsample, gausscheck, cutoff=1000):
     with open(filename, 'r') as f:
         reader = csv.reader(f)
         data = list(reader)
@@ -38,6 +38,11 @@ def import_data(filename, plot, fs, time, detrend, downsample, gausscheck):
         fs_new = fs // q
         data = data_new
 
+    # Apply filter to data
+    b, a = scipy.signal.butter(4, cutoff, btype='low', fs=fs, analog=False)
+    for i in range(n_cols):
+        data[:, i] = scipy.signal.filtfilt(b, a, data[:, i])
+
     # Plot data
     if plot:
         # Plotting the Data
@@ -63,6 +68,35 @@ def import_data(filename, plot, fs, time, detrend, downsample, gausscheck):
 
     # return data
     return data, fs_new
+
+
+def harmonic_est(data, delta_f, f_max, fs, threshold):
+    # get dimensions
+    n_rows, n_cols = data.shape
+    # Normalize data (zero mean, unit variance)
+    data_norm = (data - data.mean(axis=0)) / data.std(axis=0)
+    # Run bandpass filter over each frequency and check for kurtosis
+    n_filt = f_max//delta_f
+    b = np.zeros((n_filt, 9))
+    a = np.zeros((n_filt, 9))
+    # filter parameters for each frequency
+    kurtosis = np.zeros((n_cols, 1))
+    kurtosis_mean = np.zeros((n_filt, 1))
+    for j in range(1, n_filt):
+        b[j, :], a[j, :] = scipy.signal.butter(4, [j*delta_f, j*delta_f+1], btype='bandpass', fs=fs, analog=False)
+        for i in range(n_cols):
+            data_filt = scipy.signal.filtfilt(b[j, :], a[j, :], data_norm[:, i])
+            # calculate kurtosis
+            kurtosis[i] = scipy.stats.kurtosis(data_filt, fisher=True)
+        kurtosis_mean[j] = np.mean(kurtosis)
+    # median of kurtosis means
+    kurtosis_median = np.median(kurtosis_mean[~np.isnan(kurtosis_mean)])
+    f_bad = []
+    for i in range(1, n_filt):
+        deviation = np.abs(kurtosis_mean[i]-kurtosis_median)
+        if deviation > threshold:
+            f_bad.append((i+1)*delta_f)
+    return np.array(f_bad)
 
 
 def cpsd_matrix(data, fs, zero_padding=True):
@@ -132,7 +166,7 @@ def smooth(data):
     return scipy.signal.savgol_filter(data, data.shape[0] // 100, 3)
 
 
-def prominence_adjust(x, y):
+def prominence_adjust(x, y, x_vert):
     # Adjusting peak-prominence with slider
     min_prominence = 0
     max_prominence = max(y)
@@ -145,6 +179,8 @@ def prominence_adjust(x, y):
     y_data = y[locs]
     x_data = x[locs]
     line, = ax.plot(x_data, y_data, 'bo')
+    for i in range(x_vert.shape[0]):
+        ax.axvline(x_vert[i], color=[0, 0, 0])
 
     # Add a slider
     ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
@@ -168,13 +204,13 @@ def prominence_adjust(x, y):
     return SliderValClass.slider_val
 
 
-def peak_picking(x, y, y2, fs, n_sval=1):
+def peak_picking(x, y, y2, x_vert, n_sval=1):
     y = y.ravel()
     y2 = y2.ravel()
     x = x.ravel()
 
     # get prominence
-    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y), None))
+    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y, x_vert=x_vert), None))
     y_data = y[locs]
     x_data = x[locs]
     # Peak Picking
@@ -217,6 +253,9 @@ def peak_picking(x, y, y2, fs, n_sval=1):
     if n_sval > 1:
         ax.plot(x, (y2 * scaling), linewidth=0.7, color='black')
     ax.plot(x_data, y_data, 'bo')  # Plot the data points in blue
+    # vertical lines at suspected harmonic frequencies
+    for i in range(x_vert.shape[0]):
+        ax.axvline(x_vert[i], color=[0, 0, 0])
     ax.set_title('Click to select points')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')

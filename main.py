@@ -9,16 +9,19 @@ if __name__ == '__main__':
     Fs = 1000
 
     # Threshold for MAC
-    mac_threshold = 0.9
+    mac_threshold = 0.85
 
     # import data (and plot)
-    acc, Fs = fdd.import_data(filename='Data/acc_data_080524_total.csv',
+    acc, Fs = fdd.import_data(filename='Data/MatlabData/MDOF_Data_2.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
                               detrend=False,
                               downsample=False,
-                              gausscheck=False)
+                              gausscheck=False,
+                              cutoff=100)
+    # find harmonic influences
+    f_harmonic = fdd.harmonic_est(data=acc, delta_f=1, f_max=100, fs=Fs, threshold=30)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = fdd.cpsd_matrix(data=acc,
@@ -29,7 +32,7 @@ if __name__ == '__main__':
     S, U, S2, U2 = fdd.sv_decomp(mCPSD)
 
     # Peak-picking
-    fPeaks, Peaks, nPeaks = fdd.peak_picking(vf, S, S2, Fs, n_sval=2)
+    fPeaks, Peaks, nPeaks = fdd.peak_picking(vf, S, S2, n_sval=1, x_vert=f_harmonic)
 
     # extract mode shape at each peak
     _, mPHI = U.shape
