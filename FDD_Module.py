@@ -166,7 +166,7 @@ def smooth(data):
     return scipy.signal.savgol_filter(data, data.shape[0] // 100, 3)
 
 
-def prominence_adjust(x, y, x_vert):
+def prominence_adjust(x, y):
     # Adjusting peak-prominence with slider
     min_prominence = 0
     max_prominence = max(y)
@@ -179,8 +179,8 @@ def prominence_adjust(x, y, x_vert):
     y_data = y[locs]
     x_data = x[locs]
     line, = ax.plot(x_data, y_data, 'bo')
-    for i in range(x_vert.shape[0]):
-        ax.axvline(x_vert[i], color=[0, 0, 0])
+    # for i in range(x_vert.shape[0]):
+    #     ax.axvline(x_vert[i], color=[0, 0, 0])
 
     # Add a slider
     ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
@@ -204,13 +204,13 @@ def prominence_adjust(x, y, x_vert):
     return SliderValClass.slider_val
 
 
-def peak_picking(x, y, y2, x_vert, n_sval=1):
+def peak_picking(x, y, y2, n_sval=1):
     y = y.ravel()
     y2 = y2.ravel()
     x = x.ravel()
 
     # get prominence
-    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y, x_vert=x_vert), None))
+    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y), None))
     y_data = y[locs]
     x_data = x[locs]
     # Peak Picking
@@ -254,8 +254,8 @@ def peak_picking(x, y, y2, x_vert, n_sval=1):
         ax.plot(x, (y2 * scaling), linewidth=0.7, color='black')
     ax.plot(x_data, y_data, 'bo')  # Plot the data points in blue
     # vertical lines at suspected harmonic frequencies
-    for i in range(x_vert.shape[0]):
-        ax.axvline(x_vert[i], color=[0, 0, 0])
+    # for i in range(x_vert.shape[0]):
+    #     ax.axvline(x_vert[i], color=[0, 0, 0])
     ax.set_title('Click to select points')
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
