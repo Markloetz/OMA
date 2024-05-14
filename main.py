@@ -12,7 +12,7 @@ if __name__ == '__main__':
     mac_threshold = 0.85
 
     # import data (and plot)
-    acc, Fs = fdd.import_data(filename='Data/MatlabData/MDOF_Data_2.csv',
+    acc, Fs = fdd.import_data(filename='Data/acc_data_140524_total.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
@@ -21,7 +21,7 @@ if __name__ == '__main__':
                               gausscheck=False,
                               cutoff=100)
     # find harmonic influences
-    f_harmonic = fdd.harmonic_est(data=acc, delta_f=1, f_max=100, fs=Fs, threshold=30)
+    # f_harmonic = fdd.harmonic_est(data=acc, delta_f=1, f_max=100, fs=Fs, threshold=30)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = fdd.cpsd_matrix(data=acc,
@@ -32,22 +32,13 @@ if __name__ == '__main__':
     S, U, S2, U2 = fdd.sv_decomp(mCPSD)
 
     # Peak-picking
-    fPeaks, Peaks, nPeaks = fdd.peak_picking(vf, S, S2, n_sval=1, x_vert=f_harmonic)
+    fPeaks, Peaks, nPeaks = fdd.peak_picking(vf, S, S2, n_sval=1)
 
     # extract mode shape at each peak
     _, mPHI = U.shape
     PHI = np.zeros((nPeaks, mPHI), dtype=np.complex_)
     for i in range(nPeaks):
         PHI[i, :] = U[np.where(vf == fPeaks[i]), :]
-
-    # Plot The Mode shapes
-    for i in range(nPeaks):
-        plt.plot(PHI[i, :].real)
-    plt.xlabel('Position')
-    plt.ylabel('')
-    plt.title('Mode Shape')
-    plt.grid(True)
-    plt.show()
 
     # EFDD-Procedure
     # calculate mac value @ each frequency for each peak
@@ -100,4 +91,11 @@ if __name__ == '__main__':
     print(zeta)
 
     # Plot Fitted SDOF-Bell Functions
-    fdd.plot_fit(fSDOF, sSDOF, wn, zeta)
+    # fdd.plot_fit(fSDOF, sSDOF, wn, zeta)
+
+    # Plot mode shapes
+    import scipy
+    discretization = scipy.io.loadmat('PlateHoleDiscretization.mat')
+    N = discretization['N']
+    E = discretization['E']
+    fdd.plot_modeshape(N, E, PHI[0, :])

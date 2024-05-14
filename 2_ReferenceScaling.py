@@ -51,20 +51,17 @@ if __name__ == '__main__':
         _, mPHI = U.shape
         PHI = np.zeros((nPeaks, mPHI), dtype=np.complex_)
         for j in range(nPeaks):
-            PHI[j, :] = U[np.where(vf == fPeaks[j]), :]
-        # absolute of the mode shape is used for scaling
-        modal_max[i] = np.abs(PHI[0, :n_ref])
-
-    print(modal_max)
+            PHI[j, :] = U[np.where(vf == fPeaks[0][j]), :]
+        # mean of the mode shape amplitudes is used for scaling (change when results are shit)
+        modal_max[i] = np.mean(np.abs(PHI[:, :n_ref]))
 
     # scaling and merging data
-    data_final = np.zeros((data.shape[0], data.shape[1]//2+1))
-    data_final[:, 0] = data[:, 0]
+    data_final = np.zeros((data.shape[0], data.shape[1]//(n_rov+n_ref)+n_ref))
+    data_final[:, (ref_pos-1)] = data[:, :n_ref]
     for i in range(n_files):
         scaling = modal_max[0]/modal_max[i]
-        data_final[:, i+1] = data[:, ((i+1)*2)-1] * scaling
+        if i not in (ref_pos-1):
+            data_final[:, i:i+n_rov] = data[:, (i*(n_ref+n_rov)-n_rov):(i*(n_ref+n_rov))] * scaling
 
-    # ave_to_csv(data_final, 'Data/acc_data_080524_total.csv')
-
-
-
+    # Store data
+    save_to_csv(data_final, 'Data/acc_data_140524_total.csv')

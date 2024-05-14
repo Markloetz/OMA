@@ -60,7 +60,7 @@ def import_data(filename, plot, fs, time, detrend, downsample, gausscheck, cutof
         alpha = 0.05
         for i in range(n_cols):
             for j in range(n_seg):
-                data_temp = data[j*n_rows//n_seg:(j*n_rows//n_seg+n_rows//n_seg), i]
+                data_temp = data[j * n_rows // n_seg:(j * n_rows // n_seg + n_rows // n_seg), i]
                 # check for normality of the signal with shapiro-wilk-test
                 _, p_val = scipy.stats.shapiro(data_temp)
                 if p_val > alpha:
@@ -76,14 +76,14 @@ def harmonic_est(data, delta_f, f_max, fs, threshold):
     # Normalize data (zero mean, unit variance)
     data_norm = (data - data.mean(axis=0)) / data.std(axis=0)
     # Run bandpass filter over each frequency and check for kurtosis
-    n_filt = f_max//delta_f
+    n_filt = f_max // delta_f
     b = np.zeros((n_filt, 9))
     a = np.zeros((n_filt, 9))
     # filter parameters for each frequency
     kurtosis = np.zeros((n_cols, 1))
     kurtosis_mean = np.zeros((n_filt, 1))
     for j in range(1, n_filt):
-        b[j, :], a[j, :] = scipy.signal.butter(4, [j*delta_f, j*delta_f+1], btype='bandpass', fs=fs, analog=False)
+        b[j, :], a[j, :] = scipy.signal.butter(4, [j * delta_f, j * delta_f + 1], btype='bandpass', fs=fs, analog=False)
         for i in range(n_cols):
             data_filt = scipy.signal.filtfilt(b[j, :], a[j, :], data_norm[:, i])
             # calculate kurtosis
@@ -93,9 +93,9 @@ def harmonic_est(data, delta_f, f_max, fs, threshold):
     kurtosis_median = np.median(kurtosis_mean[~np.isnan(kurtosis_mean)])
     f_bad = []
     for i in range(1, n_filt):
-        deviation = np.abs(kurtosis_mean[i]-kurtosis_median)
+        deviation = np.abs(kurtosis_mean[i] - kurtosis_median)
         if deviation > threshold:
-            f_bad.append((i+1)*delta_f)
+            f_bad.append((i + 1) * delta_f)
     return np.array(f_bad)
 
 
@@ -118,8 +118,8 @@ def cpsd_matrix(data, fs, zero_padding=True):
     # window = 'hann'
     # CSPD-Parameters (Matlab-Style) -> very good for fitting
     window = 'hamming'
-    n_per_seg = np.floor(n_rows / 8)  # divide into 8 segments
-    n_overlap = np.floor(0 * n_per_seg)  # Matlab uses zero overlap
+    n_per_seg = np.floor(n_rows / 8)    # divide into 8 segments
+    n_overlap = np.floor(0 * n_per_seg) # Matlab uses zero overlap
 
     # preallocate cpsd-matrix and frequency vector
     n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed
@@ -129,12 +129,14 @@ def cpsd_matrix(data, fs, zero_padding=True):
     # Build cpsd-matrix
     for i in range(n_cols):
         for j in range(n_cols):
-            f, cpsd[i, j, :] = scipy.signal.csd(data[:, i],
-                                                data[:, j],
-                                                fs=fs,
-                                                nperseg=n_per_seg,
-                                                noverlap=n_overlap,
-                                                window=window)
+            b, a = scipy.signal.butter(4, 100, fs=fs)
+            f, sd = scipy.signal.csd(data[:, i],
+                                     data[:, j],
+                                     fs=fs,
+                                     nperseg=n_per_seg,
+                                     noverlap=n_overlap,
+                                     window=window)
+            cpsd[i, j, :] = scipy.signal.filtfilt(b, a, sd)
 
     # return cpsd-matrix
     return cpsd, f
@@ -204,10 +206,17 @@ def prominence_adjust(x, y):
     return SliderValClass.slider_val
 
 
-def peak_picking(x, y, y2, n_sval=1):
+def peak_picking(x, y, y2, n_sval=1, scale='dB'):
     y = y.ravel()
     y2 = y2.ravel()
     x = x.ravel()
+
+    if scale == 'dB':
+        y = 20 * np.log10(y)
+        y2 = 20 * np.log10(y2)
+    elif scale == 'linear':
+        y = y
+        y2 = y2
 
     # get prominence
     locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y), None))
@@ -271,7 +280,8 @@ def peak_picking(x, y, y2, n_sval=1):
 
     # Store number of selected points
     n_points = len(selected_points['x'])
-    return selected_points['x'], selected_points['y'], n_points
+    y_out = np.array(selected_points['y'])
+    return selected_points['x'], 10 ** (y_out / 20), n_points
 
 
 def mac_calc(phi, u):
@@ -529,3 +539,46 @@ def sdof_half_power(f, y, fn):
     delta_f = f[ind_high] - f[ind_low]
     zeta_est = delta_f / 2 / fn
     return fn * 2 * np.pi, zeta_est
+
+
+def plot_modeshape(N, E, mode_shape):
+    N_temp = np.zeros((N.shape[0], N.shape[1]+1))
+    N_temp[:, 2] = mode_shape
+    N_temp[:, :2] = N
+    N = N_temp
+
+    from mpl_toolkits.mplot3d import Axes3D
+    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+
+    # Normalize mode shape for coloring
+    normalized_displacement = (mode_shape - np.min(mode_shape)) / (np.max(mode_shape) - np.min(mode_shape))
+
+    # Create a 3D plot
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    # Plot each element face with interpolated color based on displacement
+    for element in E:
+        # Get the coordinates of the nodes for this element
+        nodes = np.array([N[node_idx] for node_idx in element])
+
+        # Calculate the mean z-coordinate for interpolation
+        z_mean = np.mean(nodes[:, 2])
+
+        # Plot the face of the element
+        poly = [nodes]
+        ax.add_collection3d(Poly3DCollection(poly, facecolors=plt.cm.RdYlGn(normalized_displacement[element].mean()),
+                                             edgecolor='black'))
+
+    # Set plot limits
+    ax.set_xlim(np.min(N[:, 0]), np.max(N[:, 0]))
+    ax.set_ylim(np.min(N[:, 1]), np.max(N[:, 1]))
+    ax.set_zlim(np.min(N[:, 2]), np.max(N[:, 2]))
+
+    # Set labels
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+
+    # Show the plot
+    plt.show()
