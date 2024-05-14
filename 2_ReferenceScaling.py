@@ -30,7 +30,7 @@ if __name__ == '__main__':
     del i
 
     # calculate and plot spectral densities of reference signals to scale them accordingly
-    modal_max = np.zeros((n_files, n_ref))
+    modal_max = np.zeros((n_files, 1))
     fPeaks = []
     Peaks = []
     nPeaks = 0
@@ -43,16 +43,19 @@ if __name__ == '__main__':
 
         # Peak-picking only one time:
         if i == 0:
-            freqs, vals, nPeaks = fdd.peak_picking(vf, S, S2, Fs, n_sval=1)
+            freqs, vals, nPeaks = fdd.peak_picking(vf, S, S2, n_sval=1)
             fPeaks.append(freqs)
             Peaks.append(vals)
 
-        # extract mode shape at each peak
+        # extract reference mode shape at each peak
         _, mPHI = U.shape
         PHI = np.zeros((nPeaks, mPHI), dtype=np.complex_)
         for j in range(nPeaks):
             PHI[j, :] = U[np.where(vf == fPeaks[j]), :]
-        modal_max[i, :] = np.abs(PHI[0, 0])
+        # absolute of the mode shape is used for scaling
+        modal_max[i] = np.abs(PHI[0, :n_ref])
+
+    print(modal_max)
 
     # scaling and merging data
     data_final = np.zeros((data.shape[0], data.shape[1]//2+1))
@@ -61,7 +64,7 @@ if __name__ == '__main__':
         scaling = modal_max[0]/modal_max[i]
         data_final[:, i+1] = data[:, ((i+1)*2)-1] * scaling
 
-    save_to_csv(data_final, 'Data/acc_data_080524_total.csv')
+    # ave_to_csv(data_final, 'Data/acc_data_080524_total.csv')
 
 
 
