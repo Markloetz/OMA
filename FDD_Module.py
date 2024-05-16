@@ -2,6 +2,7 @@ import numpy as np
 import csv
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
+from matplotlib import cm
 import scipy
 
 
@@ -118,8 +119,8 @@ def cpsd_matrix(data, fs, zero_padding=True):
     # window = 'hann'
     # CSPD-Parameters (Matlab-Style) -> very good for fitting
     window = 'hamming'
-    n_per_seg = np.floor(n_rows / 8)    # divide into 8 segments
-    n_overlap = np.floor(0 * n_per_seg) # Matlab uses zero overlap
+    n_per_seg = np.floor(n_rows / 8)  # divide into 8 segments
+    n_overlap = np.floor(0 * n_per_seg)  # Matlab uses zero overlap
 
     # preallocate cpsd-matrix and frequency vector
     n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed
@@ -542,16 +543,38 @@ def sdof_half_power(f, y, fn):
 
 
 def plot_modeshape(N, E, mode_shape):
-    N_temp = np.zeros((N.shape[0], N.shape[1]+1))
+    N_temp = np.zeros((N.shape[0], N.shape[1] + 1))
     N_temp[:, 2] = mode_shape
     N_temp[:, :2] = N
     N = N_temp
 
-    from mpl_toolkits.mplot3d import Axes3D
-    from mpl_toolkits.mplot3d.art3d import Poly3DCollection
+    def set_axes_equal(ax):
+        """
+        Make axes of 3D plot have equal scale so that spheres appear as spheres,
+        cubes as cubes, etc.
 
-    # Normalize mode shape for coloring
-    normalized_displacement = (mode_shape - np.min(mode_shape)) / (np.max(mode_shape) - np.min(mode_shape))
+        Input
+          ax: a matplotlib axis, e.g., as output from plt.gca().
+        """
+
+        x_limits = ax.get_xlim3d()
+        y_limits = ax.get_ylim3d()
+        z_limits = ax.get_zlim3d()
+
+        x_range = abs(x_limits[1] - x_limits[0])
+        x_middle = np.mean(x_limits)
+        y_range = abs(y_limits[1] - y_limits[0])
+        y_middle = np.mean(y_limits)
+        z_range = abs(z_limits[1] - z_limits[0])
+        z_middle = np.mean(z_limits)
+
+        # The plot bounding box is a sphere in the sense of the infinity
+        # norm, hence I call half the max range the plot radius.
+        plot_radius = 0.5 * max([x_range, y_range, z_range])
+
+        ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
+        ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
+        ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
     # Create a 3D plot
     fig = plt.figure()
@@ -560,15 +583,13 @@ def plot_modeshape(N, E, mode_shape):
     # Plot each element face with interpolated color based on displacement
     for element in E:
         # Get the coordinates of the nodes for this element
-        nodes = np.array([N[node_idx] for node_idx in element])
+        nodes = np.array([N[node_idx - 1] for node_idx in element])
 
-        # Calculate the mean z-coordinate for interpolation
-        z_mean = np.mean(nodes[:, 2])
+        # Extract x, y, z coordinates of the nodes
+        x, y, z = nodes[:, 0], nodes[:, 1], nodes[:, 2]
 
-        # Plot the face of the element
-        poly = [nodes]
-        ax.add_collection3d(Poly3DCollection(poly, facecolors=plt.cm.RdYlGn(normalized_displacement[element].mean()),
-                                             edgecolor='black'))
+        # Plot the polygon
+        ax.plot_trisurf(x, y, z, triangles=[[0, 1, 2]], cmap=cm.jet, alpha=0.5, )
 
     # Set plot limits
     ax.set_xlim(np.min(N[:, 0]), np.max(N[:, 0]))
@@ -581,4 +602,5 @@ def plot_modeshape(N, E, mode_shape):
     ax.set_zlabel('Z')
 
     # Show the plot
+    set_axes_equal(ax)
     plt.show()
