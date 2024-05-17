@@ -135,12 +135,12 @@ if __name__ == "__main__":
     device_in = "cDAQ9189-1CDF2BFMod2"
     device_out = "cDAQ9189-1CDF2BFMod1"
     device_force = "cDAQ9189-1CDF2BFMod3"
-    channels = [0, 1]
-    sensitivities = [1.008, 1.060]  # mv/ms^-2
+    channels = [0, 1, 2, 3]
+    sensitivities = [1.016, 1.060, 1.036, 1.008]  # mv/ms^-2
     force_sensitivity = 1
-    duration = 30
+    duration = 60
     sample_rate = 1000
-    csv_filename = "Data/Hammer.csv"
+    csv_filename = "Data/ShakerOMA/acc_data_17_05_24_37_38.csv"
     force_filename = "Data/force_data_disgard.csv"
 
     acc_data, force_data = daq_oma(device_in=device_in,
@@ -152,5 +152,5 @@ if __name__ == "__main__":
                                    acc_sensitivities=sensitivities,
                                    force_sensitivity=force_sensitivity)
     save_to_csv(acc_data, csv_filename)
-    save_to_csv(force_data, force_filename)
+    # save_to_csv(force_data, force_filename)
     plot_data(acc_data, sample_rate)

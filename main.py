@@ -10,10 +10,10 @@ if __name__ == '__main__':
     Fs = 1000
 
     # Threshold for MAC
-    mac_threshold = 0.9
+    mac_threshold = 0.75
 
     # import data (and plot)
-    acc, Fs = fdd.import_data(filename='Data/MatlabData/MDOF_Data.csv',
+    acc, Fs = fdd.import_data(filename='Data/ShakerOMA/acc_data_17_05_24_02_03.csv',
                               plot=False,
                               fs=Fs,
                               time=60,

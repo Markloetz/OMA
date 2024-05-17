@@ -113,8 +113,8 @@ def cpsd_matrix(data, fs, zero_padding=True):
         n_rows = n_rows * n_padding
 
     # CSPD-Parameters (PyOMA) -> Use a mix between matlab default and pyoma
-    df = fs/n_rows
-    n_per_seg = int(fs/df)
+    df = fs / n_rows
+    n_per_seg = int(fs / df)
     # n_overlap = np.floor(n_per_seg*0.5)
     # window = 'hann'
     # CSPD-Parameters (Matlab-Style) -> very good for fitting
@@ -167,14 +167,14 @@ def sv_decomp(mat):
 
 def prominence_adjust(x, y):
     # Adjusting peak-prominence with slider
-    min_prominence = abs(max(y)/100)
+    min_prominence = abs(max(y) / 100)
     max_prominence = abs(max(y))
     # Create the plot
     figure, ax = plt.subplots()
     plt.subplots_adjust(bottom=0.25)  # Adjust bottom to make space for the slider
 
     # Plot the initial data
-    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None), distance=np.ceil(len(x)/1000))
+    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None), distance=np.ceil(len(x) / 1000))
     y_data = y[locs]
     x_data = x[locs]
     line, = ax.plot(x_data, y_data, 'bo')
@@ -186,7 +186,8 @@ def prominence_adjust(x, y):
     # Update Plot
     def update(val):
         SliderValClass.slider_val = val
-        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None), distance=np.ceil(len(x)/1000))
+        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None),
+                                           distance=np.ceil(len(x) / 1000))
         y_data_current = y[locs_]
         x_data_current = x[locs_]
         line.set_xdata(x_data_current)
@@ -207,7 +208,7 @@ def peak_picking(x, y, y2, n_sval=1):
     x = x.ravel()
 
     # get prominence
-    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y), None), distance=np.ceil(len(x)/1000))
+    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y), None), distance=np.ceil(len(x) / 1000))
     y_data = y[locs]
     x_data = x[locs]
     # Peak Picking
@@ -367,25 +368,32 @@ def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30):
     f = f.ravel()
 
     # inverse fft to get autocorrelation function
-    sdof_corr = np.fft.irfft(y)[:f.shape[0]]
-    df = np.mean(np.diff(f))        # Frequency resolution
-    t = np.linspace(0, 1/df, f.shape[0])
-    # normalize correlation
-    sdof_corr = sdof_corr/np.max(sdof_corr)
+    sdof_corr = np.fft.ifft(y, n=len(y) * 20, axis=0, norm='ortho').real
+    df = np.mean(np.diff(f))  # Frequency resolution
+    t = np.linspace(0, 8, len(sdof_corr))
+    # normalize and cut correlation
+    sdof_corr = sdof_corr.real / np.max(sdof_corr.real)
+    sdof_corr = sdof_corr[:len(sdof_corr)//2]
+    t = t[:len(t)//2]
     # find zero crossing indices (with sign changes ... similar to pyOMA)
-    sign = np.diff(np.sign(sdof_corr).real)
+    sign = np.diff(np.sign(sdof_corr))
     zero_crossing_idx = np.where(sign)[0]
     # find maxima and minima between the zero crossings (peaks/valleys)
-    maxima = [np.max(sdof_corr[zero_crossing_idx[i]:zero_crossing_idx[i + 2]]) for i in range(0, len(zero_crossing_idx) - 2, 2)]
-    minima = [np.min(sdof_corr[zero_crossing_idx[i]:zero_crossing_idx[i + 2]]) for i in range(0, len(zero_crossing_idx) - 2, 2)]
+    maxima = [np.max(sdof_corr[zero_crossing_idx[i]:zero_crossing_idx[i + 2]])
+              for i in range(0, len(zero_crossing_idx) - 2, 2)]
+    minima = [np.min(sdof_corr[zero_crossing_idx[i]:zero_crossing_idx[i + 2]])
+              for i in range(0, len(zero_crossing_idx) - 2, 2)]
     # match the lengths of the arrays to be able to fit them in a single array
     if len(maxima) > len(minima):
         maxima = maxima[:-1]
     elif len(maxima) < len(minima):
         minima = minima[:-1]
     # indices of minima and maxima
-    maxima_idx = [np.argmin(abs(sdof_corr - maxx)) for maxx in sdof_corr]
-    minima_idx = [np.argmin(abs(sdof_corr - minn)) for minn in sdof_corr]
+    maxima_idx = np.zeros((len(maxima)), dtype=int)
+    minima_idx = np.zeros((len(minima)), dtype=int)
+    for i in range(len(minima)):
+        maxima_idx[i] = np.where(sdof_corr == maxima[i])[0][0]
+        minima_idx[i] = np.where(sdof_corr == minima[i])[0][0]
     # Fit maxima and minima in single array and flatten
     minmax = np.array((minima, maxima))
     minmax = np.ravel(minmax, order='F')
@@ -393,26 +401,25 @@ def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30):
     minmax_idx = np.array((minima_idx, maxima_idx))
     minmax_idx = np.ravel(minmax_idx, order='F')
     # Remove first and last peaks with n_skip (peaks to skip) and n_peaks (number of peaks to use in fit)
-    if (n_skip+n_peaks) >= len(minmax):
-        n_peaks = len(minmax)-n_skip
+    if (n_skip + n_peaks) >= len(minmax):
+        n_peaks = len(minmax) - n_skip
     minmax_fit = np.array([minmax[_a] for _a in range(n_skip, n_skip + n_peaks)])
     minmax_fit_idx = np.array([minmax_idx[_a] for _a in range(n_skip, n_skip + n_peaks)])
     # natural frequency estimation
-    fn_est = 1/np.mean(np.diff(t[minmax_fit_idx]) * 2)
+    fn_est = 1 / np.mean(np.diff(t[minmax_fit_idx]) * 2)
     # Fit damping ratio
     delta = np.array([2 * np.log(np.abs(minmax[0]) / np.abs(minmax[_i])) for _i in range(len(minmax_fit))])
 
-    # Fit damping ratio
-    # fun = lambda x, m: m * x
     def fun(x, m):
-        return m*x
-    m, _ = scipy.optimize.curve_fit(fun, np.arange(len(minmax_fit)), delta)
+        return m * x
 
-    # damping ratio
+    m, _ = scipy.optimize.curve_fit(fun, np.arange(len(minmax_fit)), delta)
     zeta_fit = m / np.sqrt(4 * np.pi ** 2 + m ** 2)
     fn_fit = fn_est / np.sqrt(1 - zeta_fit ** 2)
-    # plot autocorrelation
+    # plot the minima and maxima over the free decay
     plt.plot(t, sdof_corr)
+    plt.plot(t[minmax_fit_idx], minmax_fit)
+    plt.grid(visible=True, which='minor')
     plt.show()
 
     return fn_fit * 2 * np.pi, zeta_fit
@@ -499,7 +506,7 @@ def plot_fit(fSDOF, sSDOF, wn, zeta):
             scaling_factor = max(sSDOF[:, i]) / max(sSDOF_fit)
             if num_cols != 1:
                 axs[i // num_cols, i % num_cols].plot(fSDOF[:, i], sSDOF[:, i].real)
-                axs[i // num_cols, i % num_cols].plot(freq_vec, sSDOF_fit)  # *scaling_factor
+                axs[i // num_cols, i % num_cols].plot(freq_vec, sSDOF_fit*scaling_factor)  # *scaling_factor
                 axs[i // num_cols, i % num_cols].set_title(f'SDOF-Fit {i + 1}')
             else:
                 axs.plot(fSDOF[:, i], sSDOF[:, i].real)
@@ -518,7 +525,7 @@ def plot_modeshape(N, E, mode_shape):
     x_diff = np.max(N[:, 0]) - np.min(N[:, 0])
     y_diff = np.max(N[:, 1]) - np.min(N[:, 1])
     longest_dim = np.max([x_diff, y_diff])
-    mode_shape = mode_shape/np.max(np.abs(mode_shape))*(longest_dim/12)
+    mode_shape = mode_shape / np.max(np.abs(mode_shape)) * (longest_dim / 12)
 
     # Write the mode shape (z-coordinates) into the node vector
     N_temp = np.zeros((N.shape[0], N.shape[1] + 1))
@@ -591,8 +598,8 @@ def plot_modeshape(N, E, mode_shape):
         nodes = np.zeros((3, 3))
         i = 0
         for node_idx in element:
-            nodes[i, :] = N[node_idx-1, :]
-            i = i+1
+            nodes[i, :] = N[node_idx - 1, :]
+            i = i + 1
         # Extract x, y, z coordinates of the nodes
         x, y, z = nodes[:, 0], nodes[:, 1], nodes[:, 2]
 
