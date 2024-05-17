@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import FDD_Module as fdd
+import scipy
 
 # Implement Filter-Script: Detrending (Highpass Filter) -> Check for Gaussian Distribution in Segments -> Page225
 
@@ -9,10 +10,10 @@ if __name__ == '__main__':
     Fs = 1000
 
     # Threshold for MAC
-    mac_threshold = 0.85
+    mac_threshold = 0.9
 
     # import data (and plot)
-    acc, Fs = fdd.import_data(filename='Data/acc_data_140524_total.csv',
+    acc, Fs = fdd.import_data(filename='Data/MatlabData/MDOF_Data.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
@@ -32,7 +33,7 @@ if __name__ == '__main__':
     S, U, S2, U2 = fdd.sv_decomp(mCPSD)
 
     # Peak-picking
-    fPeaks, Peaks, nPeaks = fdd.peak_picking(vf, S, S2, n_sval=1)
+    fPeaks, Peaks, nPeaks = fdd.peak_picking(vf, 20 * np.log10(S), 20 * np.log10(S2), n_sval=1)
 
     # extract mode shape at each peak
     _, mPHI = U.shape
@@ -76,26 +77,24 @@ if __name__ == '__main__':
     plt.grid(True)
     plt.show()
 
-    # Print natural frquencies from svd
-    print(fPeaks)
-
     # Fitting SDOF in frequency domain
     wn = np.zeros((nPeaks, 1))
     zeta = np.zeros((nPeaks, 1))
     for i in range(nPeaks):
         # wn[i, :], zeta[i, :] = fdd.sdof_frf_fit(sSDOF[:, i], fSDOF[:, i], fPeaks[i])
         # wn[i, :], zeta[i, :], _ = fdd.sdof_cf(fSDOF[:, i], sSDOF[:, i])
-        wn[i, :], zeta[i, :] = fdd.sdof_half_power(fSDOF[:, i], sSDOF[:, i], fPeaks[i])
+        # wn[i, :], zeta[i, :] = fdd.sdof_half_power(fSDOF[:, i], sSDOF[:, i], fPeaks[i])
+        wn[i, :], zeta[i, :] = fdd.sdof_time_domain_fit(sSDOF[:, i], vf, n_skip=0, n_peaks=30)
     # Print Damping and natural frequencies
     print(wn / 2 / np.pi)
     print(zeta)
 
     # Plot Fitted SDOF-Bell Functions
-    # fdd.plot_fit(fSDOF, sSDOF, wn, zeta)
+    fdd.plot_fit(fSDOF, sSDOF, wn, zeta)
 
     # Plot mode shapes
-    import scipy
     discretization = scipy.io.loadmat('PlateHoleDiscretization.mat')
     N = discretization['N']
     E = discretization['E']
-    fdd.plot_modeshape(N, E, PHI[0, :])
+    # for i in range(nPeaks):
+    #     fdd.plot_modeshape(N, E, PHI[i, :])

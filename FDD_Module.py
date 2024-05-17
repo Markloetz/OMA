@@ -2,7 +2,7 @@ import numpy as np
 import csv
 import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
-from matplotlib import cm
+from matplotlib import cm, colors, tri
 import scipy
 
 
@@ -106,21 +106,22 @@ def cpsd_matrix(data, fs, zero_padding=True):
 
     # Zero padding
     if zero_padding:
-        n_padding = 5
+        n_padding = 2
         buffer = np.zeros((n_rows * n_padding, n_cols))
         buffer[:n_rows, :] = data
         data = buffer
         n_rows = n_rows * n_padding
 
-    # CSPD-Parameters (PyOMA) -> not ideal for EFDD, especially fitting
-    # df = fs/n_rows
-    # n_per_seg = int(fs/df)
+    # CSPD-Parameters (PyOMA) -> Use a mix between matlab default and pyoma
+    df = fs/n_rows
+    n_per_seg = int(fs/df)
     # n_overlap = np.floor(n_per_seg*0.5)
     # window = 'hann'
     # CSPD-Parameters (Matlab-Style) -> very good for fitting
     window = 'hamming'
-    n_per_seg = np.floor(n_rows / 8)  # divide into 8 segments
-    n_overlap = np.floor(0 * n_per_seg)  # Matlab uses zero overlap
+    n_seg = 8
+    n_per_seg = np.floor(n_rows / n_seg)  # divide into 8 segments
+    n_overlap = np.floor(0.5 * n_per_seg)  # Matlab uses zero overlap
 
     # preallocate cpsd-matrix and frequency vector
     n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed
@@ -130,20 +131,19 @@ def cpsd_matrix(data, fs, zero_padding=True):
     # Build cpsd-matrix
     for i in range(n_cols):
         for j in range(n_cols):
-            b, a = scipy.signal.butter(4, 100, fs=fs)
             f, sd = scipy.signal.csd(data[:, i],
                                      data[:, j],
                                      fs=fs,
                                      nperseg=n_per_seg,
                                      noverlap=n_overlap,
                                      window=window)
-            cpsd[i, j, :] = scipy.signal.filtfilt(b, a, sd)
+            cpsd[i, j, :] = sd
 
     # return cpsd-matrix
     return cpsd, f
 
 
-def sv_decomp(mat, smooth=False):
+def sv_decomp(mat):
     # get dimensions
     n_cols, _, n_rows = mat.shape
 
@@ -165,25 +165,19 @@ def sv_decomp(mat, smooth=False):
     return s1, u1, s2, u2
 
 
-def smooth(data):
-    return scipy.signal.savgol_filter(data, data.shape[0] // 100, 3)
-
-
 def prominence_adjust(x, y):
     # Adjusting peak-prominence with slider
-    min_prominence = 0
-    max_prominence = max(y)
+    min_prominence = abs(max(y)/100)
+    max_prominence = abs(max(y))
     # Create the plot
     figure, ax = plt.subplots()
     plt.subplots_adjust(bottom=0.25)  # Adjust bottom to make space for the slider
 
     # Plot the initial data
-    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None))
+    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None), distance=np.ceil(len(x)/1000))
     y_data = y[locs]
     x_data = x[locs]
     line, = ax.plot(x_data, y_data, 'bo')
-    # for i in range(x_vert.shape[0]):
-    #     ax.axvline(x_vert[i], color=[0, 0, 0])
 
     # Add a slider
     ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
@@ -192,7 +186,7 @@ def prominence_adjust(x, y):
     # Update Plot
     def update(val):
         SliderValClass.slider_val = val
-        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None))
+        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None), distance=np.ceil(len(x)/1000))
         y_data_current = y[locs_]
         x_data_current = x[locs_]
         line.set_xdata(x_data_current)
@@ -207,20 +201,13 @@ def prominence_adjust(x, y):
     return SliderValClass.slider_val
 
 
-def peak_picking(x, y, y2, n_sval=1, scale='dB'):
+def peak_picking(x, y, y2, n_sval=1):
     y = y.ravel()
     y2 = y2.ravel()
     x = x.ravel()
 
-    if scale == 'dB':
-        y = 20 * np.log10(y)
-        y2 = 20 * np.log10(y2)
-    elif scale == 'linear':
-        y = y
-        y2 = y2
-
     # get prominence
-    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y), None))
+    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y), None), distance=np.ceil(len(x)/1000))
     y_data = y[locs]
     x_data = x[locs]
     # Peak Picking
@@ -332,7 +319,27 @@ def sdof_frf(f, omega_n, zeta):
     return np.abs(h) ** 2
 
 
-def sdof_frf_fit(y, f, wn):
+def sdof_half_power(f, y, fn):
+    # removing nan
+    f = f[~np.isnan(f)]
+    y = y[~np.isnan(y)]
+
+    # Applying the half power method to estimeate the damping coefficients
+    # extract peak value and the half power value
+    y_wn = y[np.where(f == fn)]
+    threshold = 0.707 * y_wn
+    # find the range north of the threshold
+    ind_range = np.where(y >= threshold)[0]
+    ind_high = ind_range[-1]
+    ind_low = ind_range[0]
+    delta_f = f[ind_high] - f[ind_low]
+    zeta_est = delta_f / 2 / fn
+    if zeta_est == 0:
+        zeta_est = 0.001
+    return fn * 2 * np.pi, zeta_est
+
+
+def sdof_frf_fit(y, f, fn):
     y = y[~np.isnan(y)]
     f = f[~np.isnan(f)]
 
@@ -340,8 +347,8 @@ def sdof_frf_fit(y, f, wn):
     y = y.ravel()
     f = f.ravel()
 
-    # Initial guess for parameters (m, k, zeta)
-    initial_guess = (wn, 0.01)
+    # calculate initial guess with half power method
+    initial_guess = sdof_half_power(f, y, fn)
 
     # Perform optimization
     popt = scipy.optimize.curve_fit(sdof_frf, f, y, p0=initial_guess, bounds=([0, 0], [1000, 1]))[0]
@@ -350,6 +357,65 @@ def sdof_frf_fit(y, f, wn):
     omega_n_optimized, zeta_optimized = popt
 
     return omega_n_optimized, zeta_optimized
+
+
+def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30):
+    y[np.isnan(y)] = 0
+
+    # rearrange arrays
+    y = y.ravel()
+    f = f.ravel()
+
+    # inverse fft to get autocorrelation function
+    sdof_corr = np.fft.irfft(y)[:f.shape[0]]
+    df = np.mean(np.diff(f))        # Frequency resolution
+    t = np.linspace(0, 1/df, f.shape[0])
+    # normalize correlation
+    sdof_corr = sdof_corr/np.max(sdof_corr)
+    # find zero crossing indices (with sign changes ... similar to pyOMA)
+    sign = np.diff(np.sign(sdof_corr).real)
+    zero_crossing_idx = np.where(sign)[0]
+    # find maxima and minima between the zero crossings (peaks/valleys)
+    maxima = [np.max(sdof_corr[zero_crossing_idx[i]:zero_crossing_idx[i + 2]]) for i in range(0, len(zero_crossing_idx) - 2, 2)]
+    minima = [np.min(sdof_corr[zero_crossing_idx[i]:zero_crossing_idx[i + 2]]) for i in range(0, len(zero_crossing_idx) - 2, 2)]
+    # match the lengths of the arrays to be able to fit them in a single array
+    if len(maxima) > len(minima):
+        maxima = maxima[:-1]
+    elif len(maxima) < len(minima):
+        minima = minima[:-1]
+    # indices of minima and maxima
+    maxima_idx = [np.argmin(abs(sdof_corr - maxx)) for maxx in sdof_corr]
+    minima_idx = [np.argmin(abs(sdof_corr - minn)) for minn in sdof_corr]
+    # Fit maxima and minima in single array and flatten
+    minmax = np.array((minima, maxima))
+    minmax = np.ravel(minmax, order='F')
+    # Fit maxima and minima indices in single array and flatten
+    minmax_idx = np.array((minima_idx, maxima_idx))
+    minmax_idx = np.ravel(minmax_idx, order='F')
+    # Remove first and last peaks with n_skip (peaks to skip) and n_peaks (number of peaks to use in fit)
+    if (n_skip+n_peaks) >= len(minmax):
+        n_peaks = len(minmax)-n_skip
+    minmax_fit = np.array([minmax[_a] for _a in range(n_skip, n_skip + n_peaks)])
+    minmax_fit_idx = np.array([minmax_idx[_a] for _a in range(n_skip, n_skip + n_peaks)])
+    # natural frequency estimation
+    fn_est = 1/np.mean(np.diff(t[minmax_fit_idx]) * 2)
+    # Fit damping ratio
+    delta = np.array([2 * np.log(np.abs(minmax[0]) / np.abs(minmax[_i])) for _i in range(len(minmax_fit))])
+
+    # Fit damping ratio
+    # fun = lambda x, m: m * x
+    def fun(x, m):
+        return m*x
+    m, _ = scipy.optimize.curve_fit(fun, np.arange(len(minmax_fit)), delta)
+
+    # damping ratio
+    zeta_fit = m / np.sqrt(4 * np.pi ** 2 + m ** 2)
+    fn_fit = fn_est / np.sqrt(1 - zeta_fit ** 2)
+    # plot autocorrelation
+    plt.plot(t, sdof_corr)
+    plt.show()
+
+    return fn_fit * 2 * np.pi, zeta_fit
 
 
 # MergedPowerSpectrum
@@ -447,106 +513,32 @@ def plot_fit(fSDOF, sSDOF, wn, zeta):
         plt.show()
 
 
-def sdof_cf(f, TF, Fmin=None, Fmax=None):
-    # Eliminate nan
-    f = f[~np.isnan(f)]
-    TF = TF[~np.isnan(TF)]
-
-    # get index of maximum
-    R = TF
-    cin = np.argmax(np.abs(TF))
-
-    # length of the dataset
-    ll = np.size(f)
-
-    # convert to rad/s and multiply with imag
-    w = f * 2 * np.pi * 1j
-
-    #
-    w2 = w * 0
-    R3 = R * 0
-
-    for i in range(1, ll + 1):
-        R3[i - 1] = np.conj(R[ll - i])
-        w2[i - 1] = np.conj(w[ll - i])
-
-    w = np.vstack((w2, w))
-    R = np.vstack((R3, R))
-
-    N = 2
-    x, y = np.meshgrid(np.arange(0, N + 1), R)
-    x, w2d = np.meshgrid(np.arange(0, N + 1), w)
-    c = -1 * w ** N * R
-
-    aa1 = w2d[:, np.arange(0, N)] \
-          ** x[:, np.arange(0, N)] \
-          * y[:, np.arange(0, N)]
-    aa2 = -w2d[:, np.arange(0, N + 1)] \
-           ** x[:, np.arange(0, N + 1)]
-    aa = np.hstack((aa1, aa2))
-
-    aa = np.reshape(aa, [-1, 5])
-
-    print(aa.shape)
-    print(c.shape)
-
-    b, _, _, _ = scipy.linalg.lstsq(aa, c)
-
-    b = b.flatten()
-    rs = np.roots(np.array([1,
-                            b[1],
-                            b[0]]))
-    omega = np.abs(rs[1])
-    z = -1 * np.real(rs[1]) / np.abs(rs[1])
-    nf = omega / 2 / np.pi
-
-    XoF1 = np.hstack(([1 / (w - rs[0]), 1 / (w - rs[1])]))
-    XoF2 = 1 / (w ** 0)
-    XoF3 = 1 / w ** 2
-    XoF = np.hstack((XoF1, XoF2, XoF3))
-
-    # check if extra _ needed
-
-    a, _, _, _ = scipy.linalg.lstsq(XoF, R)
-    XoF = XoF[np.arange(ll, 2 * ll), :].dot(a)
-
-    a = np.sqrt(-2 * np.imag(a[0]) * np.imag(rs[0])
-                - 2 * np.real(a[0]) * np.real(rs[0]))
-
-    phase = np.unwrap(np.angle(TF), np.pi, 0) * 180 / np.pi
-    phase2 = np.unwrap(np.angle(XoF), np.pi, 0) * 180 / np.pi
-    while phase2[cin] > 50:
-        phase2 = phase2 - 360
-    phased = phase2[cin] - phase[cin]
-    phase = phase + np.round(phased / 360) * 360
-
-    a = a[0] ** 2 / (2 * np.pi * nf) ** 2
-    return z, nf, a
-
-
-def sdof_half_power(f, y, fn):
-    # removing nan
-    f = f[~np.isnan(f)]
-    y = y[~np.isnan(y)]
-
-    # Applying the half power method to estimeate the damping coefficients
-    # extract peak value and the half power value
-    y_wn = y[np.where(f == fn)]
-    threshold = 0.707 * y_wn
-    # find the range north of the threshold
-    ind_range = np.where(y >= threshold)[0]
-    ind_high = ind_range[-1]
-    ind_low = ind_range[0]
-    delta_f = f[ind_high] - f[ind_low]
-    zeta_est = delta_f / 2 / fn
-    return fn * 2 * np.pi, zeta_est
-
-
 def plot_modeshape(N, E, mode_shape):
+    # scale mode shapes according to the size of the object
+    x_diff = np.max(N[:, 0]) - np.min(N[:, 0])
+    y_diff = np.max(N[:, 1]) - np.min(N[:, 1])
+    longest_dim = np.max([x_diff, y_diff])
+    mode_shape = mode_shape/np.max(np.abs(mode_shape))*(longest_dim/12)
+
+    # Write the mode shape (z-coordinates) into the node vector
     N_temp = np.zeros((N.shape[0], N.shape[1] + 1))
-    N_temp[:, 2] = mode_shape
+    N_temp[:, 2] = np.abs(mode_shape)
     N_temp[:, :2] = N
     N = N_temp
+
+    def symmetrical_colormap(cmap):
+        # this defined the roughness of the colormap, 128 fine
+        n = 128
+
+        # get the list of color from colormap
+        colors_r = cmap(np.linspace(0, 1, n))  # take the standard colormap # 'right-part'
+        colors_l = colors_r[::-1]  # take the first list of color and flip the order # "left-part"
+
+        # combine them and build a new colormap
+        color = np.vstack((colors_l, colors_r))
+        mymap = colors.LinearSegmentedColormap.from_list('symmetric_jet', color)
+
+        return mymap
 
     def set_axes_equal(ax):
         """
@@ -579,17 +571,40 @@ def plot_modeshape(N, E, mode_shape):
     # Create a 3D plot
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    # Make the norm
+    norm = colors.Normalize(vmin=np.min(N[:, 2]), vmax=np.max(N[:, 2]), clip=False)
+    # Create symmetric colormap
+    myMap = symmetrical_colormap(cm.jet)
+    # create a transparent colormap
+    # Define discrete colors with alpha
+    color = [
+        (1.0, 0.0, 0.0, 0.0),  # Fully transparent red
+        (0.0, 1.0, 0.0, 0.0),  # Semi-transparent green
+        (0.0, 0.0, 1.0, 0.0)  # Fully opaque blue
+    ]
+
+    cm_transparent = colors.ListedColormap(color)
 
     # Plot each element face with interpolated color based on displacement
     for element in E:
         # Get the coordinates of the nodes for this element
-        nodes = np.array([N[node_idx - 1] for node_idx in element])
-
+        nodes = np.zeros((3, 3))
+        i = 0
+        for node_idx in element:
+            nodes[i, :] = N[node_idx-1, :]
+            i = i+1
         # Extract x, y, z coordinates of the nodes
         x, y, z = nodes[:, 0], nodes[:, 1], nodes[:, 2]
 
+        # refine mesh for interpolated colormapping
+        triang = tri.Triangulation(x, y)
+        refiner = tri.UniformTriRefiner(triang)
+        interpolator = tri.LinearTriInterpolator(triang, z)
+        new, new_z = refiner.refine_field(z, interpolator, subdiv=4)
+
         # Plot the polygon
-        ax.plot_trisurf(x, y, z, triangles=[[0, 1, 2]], cmap=cm.jet, alpha=0.5, )
+        ax.plot_trisurf(new.x, new.y, new_z, cmap=myMap, norm=norm, alpha=1, linewidth=0)
+        ax.plot_trisurf(x, y, z, triangles=[[0, 1, 2]], cmap=cm_transparent, linewidth=1, edgecolor='black')
 
     # Set plot limits
     ax.set_xlim(np.min(N[:, 0]), np.max(N[:, 0]))
