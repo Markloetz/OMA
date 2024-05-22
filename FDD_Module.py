@@ -77,28 +77,34 @@ def harmonic_est(data, delta_f, f_max, fs, threshold):
     # Normalize data (zero mean, unit variance)
     data_norm = (data - data.mean(axis=0)) / data.std(axis=0)
     # Run bandpass filter over each frequency and check for kurtosis
-    n_filt = f_max // delta_f
-    b = np.zeros((n_filt, 9))
-    a = np.zeros((n_filt, 9))
+    n_filt = int(f_max // delta_f)
     # filter parameters for each frequency
     kurtosis = np.zeros((n_cols, 1))
     kurtosis_mean = np.zeros((n_filt, 1))
-    for j in range(1, n_filt):
-        b[j, :], a[j, :] = scipy.signal.butter(4, [j * delta_f, j * delta_f + 1], btype='bandpass', fs=fs, analog=False)
+    for j in range(5, n_filt):
+        b = np.zeros((n_filt, 7))
+        a = np.zeros((n_filt, 7))
+        b[j, :], a[j, :] = scipy.signal.butter(3, [j * delta_f-delta_f/2, j * delta_f + delta_f/2],
+                                                   btype='bandpass', fs=fs, analog=False)
         for i in range(n_cols):
             data_filt = scipy.signal.filtfilt(b[j, :], a[j, :], data_norm[:, i])
+            # only use second half of data due to filter behaviour
+            data_filt = data_filt[len(data_filt)//2:-1]
+            # plt.plot(data_filt)
+            # plt.show()
             # calculate kurtosis
             kurtosis[i] = scipy.stats.kurtosis(data_filt, fisher=True)
         kurtosis_mean[j] = np.mean(kurtosis)
     # median of kurtosis means
     kurtosis_median = np.median(kurtosis_mean[~np.isnan(kurtosis_mean)])
+    plt.plot(kurtosis_mean)
+    plt.show()
     f_bad = []
     for i in range(1, n_filt):
         deviation = np.abs(kurtosis_mean[i] - kurtosis_median)
         if deviation > threshold:
             f_bad.append((i + 1) * delta_f)
     return np.array(f_bad)
-
 
 def cpsd_matrix(data, fs, zero_padding=True):
     # get dimensions
@@ -113,15 +119,15 @@ def cpsd_matrix(data, fs, zero_padding=True):
         n_rows = n_rows * n_padding
 
     # CSPD-Parameters (PyOMA) -> Use a mix between matlab default and pyoma
-    df = fs / n_rows
+    df = fs / n_rows * 2
     n_per_seg = int(fs / df)
-    # n_overlap = np.floor(n_per_seg*0.5)
-    # window = 'hann'
+    n_overlap = np.floor(n_per_seg*0.5)
+    window = 'hann'
     # CSPD-Parameters (Matlab-Style) -> very good for fitting
-    window = 'hamming'
-    n_seg = 8
-    n_per_seg = np.floor(n_rows / n_seg)  # divide into 8 segments
-    n_overlap = np.floor(0.5 * n_per_seg)  # Matlab uses zero overlap
+    # window = 'hamming'
+    # n_seg = 8
+    # n_per_seg = np.floor(n_rows / n_seg)  # divide into 8 segments
+    # n_overlap = np.floor(0 * n_per_seg)  # Matlab uses zero overlap
 
     # preallocate cpsd-matrix and frequency vector
     n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed

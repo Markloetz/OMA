@@ -13,7 +13,7 @@ if __name__ == '__main__':
     mac_threshold = 0.75
 
     # import data (and plot)
-    acc, Fs = fdd.import_data(filename='Data/ShakerOMA/acc_data_17_05_24_02_03.csv',
+    acc, Fs = fdd.import_data(filename='Data/MatlabData/MDOF_Data_2.csv',
                               plot=False,
                               fs=Fs,
                               time=60,
@@ -80,21 +80,21 @@ if __name__ == '__main__':
     # Fitting SDOF in frequency domain
     wn = np.zeros((nPeaks, 1))
     zeta = np.zeros((nPeaks, 1))
-    for i in range(nPeaks):
+    # for i in range(nPeaks):
         # wn[i, :], zeta[i, :] = fdd.sdof_frf_fit(sSDOF[:, i], fSDOF[:, i], fPeaks[i])
         # wn[i, :], zeta[i, :], _ = fdd.sdof_cf(fSDOF[:, i], sSDOF[:, i])
         # wn[i, :], zeta[i, :] = fdd.sdof_half_power(fSDOF[:, i], sSDOF[:, i], fPeaks[i])
-        wn[i, :], zeta[i, :] = fdd.sdof_time_domain_fit(sSDOF[:, i], vf, n_skip=0, n_peaks=30)
+        # wn[i, :], zeta[i, :] = fdd.sdof_time_domain_fit(sSDOF[:, i], vf, n_skip=0, n_peaks=30)
     # Print Damping and natural frequencies
-    print(wn / 2 / np.pi)
-    print(zeta)
+    # print(wn / 2 / np.pi)
+    # print(zeta)
 
     # Plot Fitted SDOF-Bell Functions
-    fdd.plot_fit(fSDOF, sSDOF, wn, zeta)
+    # fdd.plot_fit(fSDOF, sSDOF, wn, zeta)
 
     # Plot mode shapes
     discretization = scipy.io.loadmat('PlateHoleDiscretization.mat')
     N = discretization['N']
     E = discretization['E']
-    # for i in range(nPeaks):
-    #     fdd.plot_modeshape(N, E, PHI[i, :])
+    for i in range(nPeaks):
+        fdd.plot_modeshape(N, E, PHI[i, :])
