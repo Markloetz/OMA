@@ -7,17 +7,17 @@ import scipy
 
 if __name__ == '__main__':
     # Specify Sampling frequency
-    Fs = 1000
+    Fs = 2048
 
     # Threshold for MAC
-    mac_threshold = 0.75
+    mac_threshold = 0.85
 
     # import data (and plot)
-    acc, Fs = fdd.import_data(filename='Data/MatlabData/MDOF_Data_2.csv',
+    acc, Fs = fdd.import_data(filename='Data/ShakerOMA/acc_data_01_09_12_33_harmonic_35Hz.csv',
                               plot=False,
                               fs=Fs,
-                              time=60,
-                              detrend=False,
+                              time=180,
+                              detrend=True,
                               downsample=False,
                               gausscheck=False,
                               cutoff=100)
@@ -40,7 +40,6 @@ if __name__ == '__main__':
     PHI = np.zeros((nPeaks, mPHI), dtype=np.complex_)
     for i in range(nPeaks):
         PHI[i, :] = U[np.where(vf == fPeaks[i]), :]
-
     # EFDD-Procedure
     # calculate mac value @ each frequency for each peak
     nMAC, _ = S.shape
@@ -59,8 +58,8 @@ if __name__ == '__main__':
     sSDOF = np.full((nMAC, nPeaks), np.nan)
     for i in range(nPeaks):
         indSDOF = fdd.find_widest_range(mac_vec[:, i].real, np.where(vf == fPeaks[i])[0])
-        fSDOF[:len(indSDOF), i] = vf[indSDOF]
-        sSDOF[:len(indSDOF), i] = S[indSDOF, 0]
+        fSDOF[indSDOF, i] = vf[indSDOF]
+        sSDOF[indSDOF, i] = S[indSDOF, 0]
 
     # Plotting the singular values
     for i in range(nPeaks):
@@ -80,21 +79,29 @@ if __name__ == '__main__':
     # Fitting SDOF in frequency domain
     wn = np.zeros((nPeaks, 1))
     zeta = np.zeros((nPeaks, 1))
-    # for i in range(nPeaks):
+    for i in range(nPeaks):
         # wn[i, :], zeta[i, :] = fdd.sdof_frf_fit(sSDOF[:, i], fSDOF[:, i], fPeaks[i])
         # wn[i, :], zeta[i, :], _ = fdd.sdof_cf(fSDOF[:, i], sSDOF[:, i])
         # wn[i, :], zeta[i, :] = fdd.sdof_half_power(fSDOF[:, i], sSDOF[:, i], fPeaks[i])
-        # wn[i, :], zeta[i, :] = fdd.sdof_time_domain_fit(sSDOF[:, i], vf, n_skip=0, n_peaks=30)
+        wn[i, :], zeta[i, :] = fdd.sdof_time_domain_fit(sSDOF[:, i], vf, Fs, n_skip=0, n_peaks=30)
     # Print Damping and natural frequencies
-    # print(wn / 2 / np.pi)
-    # print(zeta)
+    print(wn / 2 / np.pi)
+    print(zeta)
 
     # Plot Fitted SDOF-Bell Functions
     # fdd.plot_fit(fSDOF, sSDOF, wn, zeta)
-
+    for i in range(nPeaks):
+        ms = fdd.modeshape_scaling(PHI[i, :].real)
+        plt.plot(ms, label="Mode: "+str(i+1))
+    plt.legend()
+    plt.show
     # Plot mode shapes
+    mode = np.zeros((nPeaks, 38))
+    for i in range(nPeaks):
+        mode_locs = np.array([0, 8, 11, 32])
+        mode[i, mode_locs] = PHI[i, :].real
     discretization = scipy.io.loadmat('PlateHoleDiscretization.mat')
     N = discretization['N']
     E = discretization['E']
     for i in range(nPeaks):
-        fdd.plot_modeshape(N, E, PHI[i, :])
+        fdd.plot_modeshape(N, E, mode[i, :])

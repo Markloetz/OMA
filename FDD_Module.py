@@ -18,8 +18,8 @@ def import_data(filename, plot, fs, time, detrend, downsample, gausscheck, cutof
         data = list(reader)
     data = np.array(data, dtype=float)
     if time < (data.shape[0] / fs):
-        data = data[:(fs * time), :]
-        t_vec = np.linspace(0, time, time * fs)
+        data = data[:int(fs * time), :]
+        t_vec = np.linspace(0, time, int(time * fs))
     else:
         t_vec = np.linspace(0, data.shape[0] / fs, data.shape[0])
 
@@ -71,7 +71,7 @@ def import_data(filename, plot, fs, time, detrend, downsample, gausscheck, cutof
     return data, fs_new
 
 
-def harmonic_est(data, delta_f, f_max, fs, threshold):
+def harmonic_est(data, delta_f, f_max, fs, plot=True):
     # get dimensions
     n_rows, n_cols = data.shape
     # Normalize data (zero mean, unit variance)
@@ -82,29 +82,35 @@ def harmonic_est(data, delta_f, f_max, fs, threshold):
     kurtosis = np.zeros((n_cols, 1))
     kurtosis_mean = np.zeros((n_filt, 1))
     for j in range(5, n_filt):
-        b = np.zeros((n_filt, 7))
-        a = np.zeros((n_filt, 7))
-        b[j, :], a[j, :] = scipy.signal.butter(3, [j * delta_f-delta_f/2, j * delta_f + delta_f/2],
-                                                   btype='bandpass', fs=fs, analog=False)
+        b = np.zeros((n_filt, 5))
+        a = np.zeros((n_filt, 5))
+        b[j, :], a[j, :] = scipy.signal.butter(2, [j * delta_f - delta_f / 2, j * delta_f + delta_f / 2],
+                                               btype='bandpass', fs=fs, analog=False)
         for i in range(n_cols):
             data_filt = scipy.signal.filtfilt(b[j, :], a[j, :], data_norm[:, i])
             # only use second half of data due to filter behaviour
-            data_filt = data_filt[len(data_filt)//2:-1]
+            data_filt = data_filt[len(data_filt) // 2:-1]
             # plt.plot(data_filt)
             # plt.show()
             # calculate kurtosis
             kurtosis[i] = scipy.stats.kurtosis(data_filt, fisher=True)
         kurtosis_mean[j] = np.mean(kurtosis)
-    # median of kurtosis means
-    kurtosis_median = np.median(kurtosis_mean[~np.isnan(kurtosis_mean)])
-    plt.plot(kurtosis_mean)
-    plt.show()
+
+    # find platykurtic frequencies and sort them
     f_bad = []
+    kurtosis_mag = []
     for i in range(1, n_filt):
-        deviation = np.abs(kurtosis_mean[i] - kurtosis_median)
-        if deviation > threshold:
+        if kurtosis_mean[i] < 0:
             f_bad.append((i + 1) * delta_f)
-    return np.array(f_bad)
+            kurtosis_mag.append(kurtosis_mean[i][0])
+    f_out = [x for _, x in sorted(zip(kurtosis_mag, f_bad))]
+    # plot relevant kurtosis mean and frequency range
+    if plot:
+        plt.plot(kurtosis_mean)
+        plt.show()
+
+    return f_out
+
 
 def cpsd_matrix(data, fs, zero_padding=True):
     # get dimensions
@@ -119,15 +125,15 @@ def cpsd_matrix(data, fs, zero_padding=True):
         n_rows = n_rows * n_padding
 
     # CSPD-Parameters (PyOMA) -> Use a mix between matlab default and pyoma
-    df = fs / n_rows * 2
-    n_per_seg = int(fs / df)
-    n_overlap = np.floor(n_per_seg*0.5)
-    window = 'hann'
+    # df = fs / n_rows * 2
+    # n_per_seg = int(fs / df)
+    # n_overlap = np.floor(n_per_seg*0.5)
+    # window = 'hann'
     # CSPD-Parameters (Matlab-Style) -> very good for fitting
-    # window = 'hamming'
-    # n_seg = 8
-    # n_per_seg = np.floor(n_rows / n_seg)  # divide into 8 segments
-    # n_overlap = np.floor(0 * n_per_seg)  # Matlab uses zero overlap
+    window = 'hamming'
+    n_seg = 18
+    n_per_seg = np.floor(n_rows / n_seg)  # divide into 8 segments
+    n_overlap = np.floor(0 * n_per_seg)  # Matlab uses zero overlap
 
     # preallocate cpsd-matrix and frequency vector
     n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed
@@ -366,7 +372,7 @@ def sdof_frf_fit(y, f, fn):
     return omega_n_optimized, zeta_optimized
 
 
-def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30):
+def sdof_time_domain_fit(y, f, fs, n_skip=3, n_peaks=30):
     y[np.isnan(y)] = 0
 
     # rearrange arrays
@@ -374,13 +380,15 @@ def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30):
     f = f.ravel()
 
     # inverse fft to get autocorrelation function
-    sdof_corr = np.fft.ifft(y, n=len(y) * 20, axis=0, norm='ortho').real
-    df = np.mean(np.diff(f))  # Frequency resolution
-    t = np.linspace(0, 8, len(sdof_corr))
+    sdof_corr = np.fft.ifft(y, n=len(y)*20, axis=0, norm='ortho').real
+    df = np.mean(np.diff(f))        # frequency resolution of the spectrum
+    dt = 1/len(f)/df                # sampling time
+    t = np.linspace(0, len(f)*dt, len(sdof_corr))
+
     # normalize and cut correlation
     sdof_corr = sdof_corr.real / np.max(sdof_corr.real)
-    sdof_corr = sdof_corr[:len(sdof_corr)//2]
-    t = t[:len(t)//2]
+    sdof_corr = sdof_corr[:len(sdof_corr) // 2]
+    t = t[:len(t) // 2]
     # find zero crossing indices (with sign changes ... similar to pyOMA)
     sign = np.diff(np.sign(sdof_corr))
     zero_crossing_idx = np.where(sign)[0]
@@ -411,6 +419,11 @@ def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30):
         n_peaks = len(minmax) - n_skip
     minmax_fit = np.array([minmax[_a] for _a in range(n_skip, n_skip + n_peaks)])
     minmax_fit_idx = np.array([minmax_idx[_a] for _a in range(n_skip, n_skip + n_peaks)])
+    # plot the minima and maxima over the free decay
+    plt.plot(t, sdof_corr)
+    plt.plot(t[minmax_fit_idx], minmax_fit)
+    plt.grid(visible=True, which='minor')
+    plt.show()
     # natural frequency estimation
     fn_est = 1 / np.mean(np.diff(t[minmax_fit_idx]) * 2)
     # Fit damping ratio
@@ -422,11 +435,6 @@ def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30):
     m, _ = scipy.optimize.curve_fit(fun, np.arange(len(minmax_fit)), delta)
     zeta_fit = m / np.sqrt(4 * np.pi ** 2 + m ** 2)
     fn_fit = fn_est / np.sqrt(1 - zeta_fit ** 2)
-    # plot the minima and maxima over the free decay
-    plt.plot(t, sdof_corr)
-    plt.plot(t[minmax_fit_idx], minmax_fit)
-    plt.grid(visible=True, which='minor')
-    plt.show()
 
     return fn_fit * 2 * np.pi, zeta_fit
 
@@ -512,7 +520,7 @@ def plot_fit(fSDOF, sSDOF, wn, zeta):
             scaling_factor = max(sSDOF[:, i]) / max(sSDOF_fit)
             if num_cols != 1:
                 axs[i // num_cols, i % num_cols].plot(fSDOF[:, i], sSDOF[:, i].real)
-                axs[i // num_cols, i % num_cols].plot(freq_vec, sSDOF_fit*scaling_factor)  # *scaling_factor
+                axs[i // num_cols, i % num_cols].plot(freq_vec, sSDOF_fit * scaling_factor)  # *scaling_factor
                 axs[i // num_cols, i % num_cols].set_title(f'SDOF-Fit {i + 1}')
             else:
                 axs.plot(fSDOF[:, i], sSDOF[:, i].real)
@@ -632,3 +640,9 @@ def plot_modeshape(N, E, mode_shape):
     # Show the plot
     set_axes_equal(ax)
     plt.show()
+
+
+def modeshape_scaling(ms):
+    max_ms = np.max(np.abs(ms))
+    ms_scaled = ms / max_ms
+    return ms_scaled-ms_scaled[0]

@@ -35,9 +35,9 @@ def generate_bandlimited_white_noise(duration, sample_rate, cut_low=5, cut_high=
     return filtered_noise * amplitude_ramp
 
 
-def sine_gen(duration, sample_rate):
+def sine_gen(duration, sample_rate, freq):
     t = np.linspace(0, duration, duration*sample_rate)
-    sine = np.sin(2 * np.pi * 10 * t)
+    sine = np.sin(2 * np.pi * freq * t)
     # Apply ramp up and ramp down
     ramp_up_samples = int(2 * sample_rate)
     ramp_down_samples = int(2 * sample_rate)
@@ -50,7 +50,8 @@ def sine_gen(duration, sample_rate):
     return sine*amplitude_ramp
 
 
-def daq_oma(device_in, device_out, device_force, channels, duration, fs, acc_sensitivities, force_sensitivity):
+def daq_oma(device_in, device_out, device_force, channels, duration, fs, acc_sensitivities, force_sensitivity,
+            harmonic_freq):
     with nidaqmx.Task() as acc_task, nidaqmx.Task() as out_task, nidaqmx.Task() as force_task:
         # Configure IEPE task
         for channel in channels:
@@ -82,12 +83,12 @@ def daq_oma(device_in, device_out, device_force, channels, duration, fs, acc_sen
                                                        sample_rate=fs,
                                                        cut_low=5,
                                                        cut_high=150)
-        sine = sine_gen(duration+4, sample_rate=fs)
+        sine = sine_gen(duration+4, sample_rate=fs, freq=harmonic_freq)
 
         # Start Analog Output
         # out_task.start()
         # out_task.write(white_noise * 10, timeout=duration + 4)
-        writer.write_many_sample(white_noise*5, timeout=duration+4)
+        writer.write_many_sample(sine*5, timeout=duration+4)
         # out_task.wait_until_done()
 
         # record accelerations
@@ -136,11 +137,11 @@ if __name__ == "__main__":
     device_out = "cDAQ9189-1CDF2BFMod1"
     device_force = "cDAQ9189-1CDF2BFMod3"
     channels = [0, 1, 2, 3]
-    sensitivities = [1.016, 1.060, 1.036, 1.008]  # mv/ms^-2
+    sensitivities = [1.016, 1.036, 1.060, 1.008]  # mv/ms^-2
     force_sensitivity = 1
-    duration = 60
-    sample_rate = 1000
-    csv_filename = "Data/ShakerOMA/acc_data_17_05_24_37_38.csv"
+    duration = 180
+    sample_rate = 2048
+    csv_filename = "Data/ShakerOMA/acc_data_01_09_12_33_harmonic_35Hz.csv"
     force_filename = "Data/force_data_disgard.csv"
 
     acc_data, force_data = daq_oma(device_in=device_in,
@@ -150,7 +151,8 @@ if __name__ == "__main__":
                                    duration=duration,
                                    fs=sample_rate,
                                    acc_sensitivities=sensitivities,
-                                   force_sensitivity=force_sensitivity)
+                                   force_sensitivity=force_sensitivity,
+                                   harmonic_freq=35)
     save_to_csv(acc_data, csv_filename)
     # save_to_csv(force_data, force_filename)
     plot_data(acc_data, sample_rate)
