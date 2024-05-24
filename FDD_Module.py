@@ -11,8 +11,49 @@ class SliderValClass:
     slider_val = 0
 
 
-# Functions
+def group_indices(indices):
+    # Sort the indices to ensure they are in order
+    indices = sorted(indices)
+
+    # Initialize an empty list to store the results
+    result = []
+
+    # Initialize variables to track the start and end of a range
+    start = indices[0]
+    end = start
+
+    for i in range(1, len(indices)):
+        if indices[i] == end + 1:
+            # If the current index is consecutive, update the end of the range
+            end = indices[i]
+        else:
+            # If the current index is not consecutive, store the current range
+            if start == end:
+                result.append(start)
+            else:
+                result.append(np.arange(start, end + 1))
+            # Reset the start and end for the new range
+            start = indices[i]
+            end = start
+
+    # Append the last range or single index
+    if start == end:
+        result.append(start)
+    else:
+        result.append(np.arange(start, end + 1))
+
+    return result
+
+
+def find_nearest(array, value):
+    array = np.asarray(array)
+    idx = (np.abs(array - value)).argmin()
+    return array[idx]
+
+
 def import_data(filename, plot, fs, time, detrend, downsample, gausscheck, cutoff=1000):
+    # notify user
+    print("Data import started...")
     with open(filename, 'r') as f:
         reader = csv.reader(f)
         data = list(reader)
@@ -43,6 +84,8 @@ def import_data(filename, plot, fs, time, detrend, downsample, gausscheck, cutof
     b, a = scipy.signal.butter(4, cutoff, btype='low', fs=fs, analog=False)
     for i in range(n_cols):
         data[:, i] = scipy.signal.filtfilt(b, a, data[:, i])
+    # notify user
+    print("Data import ended...")
 
     # Plot data
     if plot:
@@ -72,12 +115,15 @@ def import_data(filename, plot, fs, time, detrend, downsample, gausscheck, cutof
 
 
 def harmonic_est(data, delta_f, f_max, fs, plot=True):
+    # notify user
+    print("Estimation of harmonic signals started...")
     # get dimensions
     n_rows, n_cols = data.shape
     # Normalize data (zero mean, unit variance)
     data_norm = (data - data.mean(axis=0)) / data.std(axis=0)
     # Run bandpass filter over each frequency and check for kurtosis
     n_filt = int(f_max // delta_f)
+    f_axis = np.linspace(0, n_filt * delta_f, n_filt)
     # filter parameters for each frequency
     kurtosis = np.zeros((n_cols, 1))
     kurtosis_mean = np.zeros((n_filt, 1))
@@ -97,24 +143,104 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
         kurtosis_mean[j] = np.mean(kurtosis)
 
     # find platykurtic frequencies and sort them
-    f_bad = []
-    kurtosis_mag = []
+    idx_bad = []
     for i in range(1, n_filt):
-        if kurtosis_mean[i] < 0:
-            f_bad.append((i + 1) * delta_f)
-            kurtosis_mag.append(kurtosis_mean[i][0])
-    f_out = [x for _, x in sorted(zip(kurtosis_mag, f_bad))]
+        if kurtosis_mean[i] < np.min(kurtosis_mean) / 3:
+            idx_bad.append(i)
+
+    # Store indices of "harmonic groups" in array
+    harmonic_idx = group_indices(idx_bad)
+    harmonic_f = []
+    for i in range(len(harmonic_idx)):
+        harmonic_f.append(harmonic_idx[i] * delta_f)
+    # notify user
+    print("Estimation of harmonic signals ended...")
     # plot relevant kurtosis mean and frequency range
+    # vertival limits
     if plot:
-        plt.plot(kurtosis_mean)
+        fig, ax = plt.subplots()
+        ax.set_ylim([-np.max(np.abs(kurtosis_mean)) * 1.5, np.max(np.abs(kurtosis_mean)) * 1.5])
+        ax.plot(f_axis, kurtosis_mean)
+        for i in range(len(harmonic_f)):
+            if isinstance(harmonic_f[i], np.ndarray):
+                ax.axvspan(harmonic_f[i][0], harmonic_f[i][-1], color='red', alpha=0.3)
+            else:
+                ax.vlines(harmonic_f[i], -np.max(np.abs(kurtosis_mean)) * 1.5, np.max(np.abs(kurtosis_mean)) * 1.5,
+                          color='red', alpha=0.3)
         plt.show()
 
-    return f_out
+    return harmonic_f
+
+
+def eliminate_harmonic(f, s, f_range):
+    figure, ax = plt.subplots()
+    ax.set_xlim([0, 100])
+    ax.set_ylim([-np.max(np.abs(20 * np.log10(s))) * 1.1, np.max(20 * np.log10(s)) * 0.9])
+    ax.set_xlabel('f (Hz)')
+    ax.set_ylabel('Singular Values (dB)')
+    ax.plot(f, 20 * np.log10(s))
+    for i in range(len(f_range)):
+        if isinstance(f_range[i], np.ndarray):
+            ax.axvspan(f_range[i][0], f_range[i][-1], color='red', alpha=0.3)
+        else:
+            ax.vlines(f_range[i], -np.max(np.abs(20 * np.log10(s))) * 1.1, np.max(20 * np.log10(s)) * 0.9,
+                      color='red', alpha=0.3)
+    plt.show()
+    del figure, ax
+
+    # calulate indices to eliminate and interpolate linearily between
+    for i in range(len(f_range)):
+        if isinstance(f_range[i], np.ndarray):
+            idx_low = np.where(f == find_nearest(f, f_range[i][0]))[0]-1
+            idx_high = np.where(f == find_nearest(f, f_range[i][-1]))[0]+1
+            # interpolate
+            idx_low = idx_low[0]
+            idx_high = idx_high[0]
+            f_low = f[idx_low]
+            f_high = f[idx_high]
+            s_low = s[idx_low]
+            s_high = s[idx_high]
+            n_interpolate = idx_high - idx_low
+            seg_int = np.linspace(0, f_high-f_low, n_interpolate) * (s_high-s_low)/(f_high-f_low) + s_low
+            s[idx_low:idx_high, 0] = seg_int
+        else:
+            idx_low = np.where(f == find_nearest(f, f_range[i]))[0]-1
+            idx_high = np.where(f == find_nearest(f, f_range[i]))[0]+1
+            # interpolate
+            idx_low = idx_low[0]
+            idx_high = idx_high[0]
+            f_low = f[idx_low]
+            f_high = f[idx_high]
+            s_low = s[idx_low]
+            s_high = s[idx_high]
+            n_interpolate = idx_high - idx_low
+            seg_int = np.linspace(0, f_high-f_low, n_interpolate) * (s_high-s_low)/(f_high-f_low) + s_low
+            s[idx_low:idx_high, 0] = seg_int
+
+    # plot singular values w.o. harmonic peaks
+    figure, ax = plt.subplots()
+    ax.set_xlim([0, 100])
+    ax.set_ylim([-np.max(np.abs(20 * np.log10(s))) * 1.1, np.max(20 * np.log10(s)) * 0.9])
+    ax.set_xlabel('f (Hz)')
+    ax.set_ylabel('Singular Values (dB)')
+    ax.plot(f, 20 * np.log10(s))
+    for i in range(len(f_range)):
+        if isinstance(f_range[i], np.ndarray):
+            ax.axvspan(f_range[i][0], f_range[i][-1], color='red', alpha=0.3)
+        else:
+            ax.vlines(f_range[i], -np.max(np.abs(20 * np.log10(s))) * 1.1, np.max(20 * np.log10(s)) * 0.9,
+                      color='red', alpha=0.3)
+    plt.show()
+
+    return s
 
 
 def cpsd_matrix(data, fs, zero_padding=True):
     # get dimensions
     n_rows, n_cols = data.shape
+
+    # notify user
+    print("CPSD calculations started...")
 
     # Zero padding
     if zero_padding:
@@ -150,7 +276,8 @@ def cpsd_matrix(data, fs, zero_padding=True):
                                      noverlap=n_overlap,
                                      window=window)
             cpsd[i, j, :] = sd
-
+    # notify user
+    print("CPSD calculations ended...")
     # return cpsd-matrix
     return cpsd, f
 
@@ -208,6 +335,8 @@ def prominence_adjust(x, y):
 
     slider.on_changed(update)
     ax.plot(x, y)
+    ax.set_xlabel('f (Hz)')
+    ax.set_ylabel('Singular Values (dB)')
     ax.set_xlim([0, 100])
     plt.show()
 
@@ -267,8 +396,8 @@ def peak_picking(x, y, y2, n_sval=1):
     # for i in range(x_vert.shape[0]):
     #     ax.axvline(x_vert[i], color=[0, 0, 0])
     ax.set_title('Click to select points')
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
+    ax.set_xlabel('f (Hz)')
+    ax.set_ylabel('Singular Values (dB)')
 
     # Show the plot
     plt.show()
@@ -380,10 +509,10 @@ def sdof_time_domain_fit(y, f, fs, n_skip=3, n_peaks=30):
     f = f.ravel()
 
     # inverse fft to get autocorrelation function
-    sdof_corr = np.fft.ifft(y, n=len(y)*20, axis=0, norm='ortho').real
-    df = np.mean(np.diff(f))        # frequency resolution of the spectrum
-    dt = 1/len(f)/df                # sampling time
-    t = np.linspace(0, len(f)*dt, len(sdof_corr))
+    sdof_corr = np.fft.ifft(y, n=len(y) * 20, axis=0, norm='ortho').real
+    df = np.mean(np.diff(f))  # frequency resolution of the spectrum
+    dt = 1 / len(f) / df  # sampling time
+    t = np.linspace(0, len(f) * dt, len(sdof_corr))
 
     # normalize and cut correlation
     sdof_corr = sdof_corr.real / np.max(sdof_corr.real)
@@ -645,4 +774,4 @@ def plot_modeshape(N, E, mode_shape):
 def modeshape_scaling(ms):
     max_ms = np.max(np.abs(ms))
     ms_scaled = ms / max_ms
-    return ms_scaled-ms_scaled[0]
+    return ms_scaled - ms_scaled[0]

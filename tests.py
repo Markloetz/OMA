@@ -16,5 +16,5 @@ if __name__ == "__main__":
                               gausscheck=False,
                               cutoff=100)
 
-    f_harmonic = fdd.harmonic_est(data=acc, delta_f=0.5, f_max=100, fs=Fs, plot=True)
+    f_harmonic = fdd.harmonic_est(data=acc, delta_f=0.2, f_max=100, fs=Fs, plot=True)
     print(f_harmonic)

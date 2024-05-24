@@ -13,7 +13,7 @@ if __name__ == '__main__':
     mac_threshold = 0.85
 
     # import data (and plot)
-    acc, Fs = fdd.import_data(filename='Data/ShakerOMA/acc_data_01_09_12_33_harmonic_35Hz.csv',
+    acc, Fs = fdd.import_data(filename='Data/ShakerOMA/acc_data_01_09_12_33_harmonic_22_5Hz.csv',
                               plot=False,
                               fs=Fs,
                               time=180,
@@ -21,8 +21,6 @@ if __name__ == '__main__':
                               downsample=False,
                               gausscheck=False,
                               cutoff=100)
-    # find harmonic influences
-    # f_harmonic = fdd.harmonic_est(data=acc, delta_f=1, f_max=100, fs=Fs, threshold=30)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = fdd.cpsd_matrix(data=acc,
@@ -31,6 +29,11 @@ if __name__ == '__main__':
 
     # SVD of CPSD-matrix @ each frequency
     S, U, S2, U2 = fdd.sv_decomp(mCPSD)
+
+    # Eliminate harmonic frequency bands (cut out harmonic peaks and interpolate)
+    # find harmonic frequency ranges
+    f_harmonic = fdd.harmonic_est(data=acc, delta_f=0.2, f_max=100, fs=Fs, plot=False)
+    S = fdd.eliminate_harmonic(vf, S, f_harmonic)
 
     # Peak-picking
     fPeaks, Peaks, nPeaks = fdd.peak_picking(vf, 20 * np.log10(S), 20 * np.log10(S2), n_sval=1)
