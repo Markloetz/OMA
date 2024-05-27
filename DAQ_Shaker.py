@@ -1,4 +1,4 @@
-import DAQ_Module as daq
+from DAQ_Module import DAQ_Module as daq
 
 if __name__ == "__main__":
     device_in = "cDAQ9189-1CDF2BFMod2"

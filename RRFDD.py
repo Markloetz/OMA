@@ -1,5 +1,5 @@
 # Rowing reference processing
-import FDD_Module as fdd
+from OMA import OMA_Module as oma
 
 if __name__ == '__main__':
     # Specify Sampling frequency
@@ -9,7 +9,7 @@ if __name__ == '__main__':
     mac_threshold = 0.85
 
     # import data (and plot)
-    acc = fdd.import_data('Data/Accelerations.csv', False, Fs, 300, detrend=True, downsample=True)
+    acc, Fs = oma.import_data('Data/Accelerations.csv', False, Fs, 300, detrend=True, downsample=True)
 
     # RRNPS plot
-    fdd.mps(acc, Fs)
+    oma.mps(acc, Fs)

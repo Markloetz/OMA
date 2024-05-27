@@ -2,7 +2,7 @@ import csv
 import glob
 import numpy as np
 import os
-import FDD_Module as fdd
+from OMA import OMA_Module as oma
 
 
 def save_to_csv(data, filename):
@@ -37,15 +37,15 @@ if __name__ == '__main__':
     nPeaks = 0
     if scaling:
         for i in range(n_files):
-            mCPSD, vf = fdd.cpsd_matrix(data=data[:, (i * (n_rov+n_ref)):(i * (n_rov+n_ref) + (n_rov+n_ref))],
+            mCPSD, vf = oma.fdd.cpsd_matrix(data=data[:, (i * (n_rov+n_ref)):(i * (n_rov+n_ref) + (n_rov+n_ref))],
                                         fs=Fs,
                                         zero_padding=True)
             # SVD of CPSD-matrix @ each frequency
-            S, U, S2, U2 = fdd.sv_decomp(mCPSD)
+            S, U, S2, U2 = oma.fdd.sv_decomp(mCPSD)
 
             # Peak-picking only one time:
             if i == 0:
-                freqs, vals, nPeaks = fdd.peak_picking(vf, S, S2, n_sval=1)
+                freqs, vals, nPeaks = oma.fdd.peak_picking(vf, S, S2, n_sval=1)
                 fPeaks.append(freqs)
                 Peaks.append(vals)
 

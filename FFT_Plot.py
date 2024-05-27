@@ -1,11 +1,11 @@
-import FDD_Module as fdd
+from OMA import OMA_Module as oma
 import numpy as np
 import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
-    Fs = 1000
-    signal, _ = fdd.import_data(filename='Data/Hammer.csv',
-                                plot=True,
+    Fs = 1690
+    signal, _ = oma.import_data(filename='Data/Hammer.csv',
+                                plot=False,
                                 fs=Fs,
                                 time=60,
                                 detrend=False,
