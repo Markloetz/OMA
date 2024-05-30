@@ -1,7 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-import control
-import scipy
 
 
 # This code is a changed version of the code from pyOMA from dagghe (https://github.com/dagghe/PyOMA/tree/master) for
@@ -55,7 +52,8 @@ def sv_decomp_ssi(p):
     return u, s, v_t
 
 
-def ssi_proc(data, fs, br, limits):
+def ssi_proc(data, fs, br):
+    print("Stochastic Subspace Identification started...")
     # Dimensions
     n_data, n_ch = data.shape
 
@@ -85,21 +83,6 @@ def ssi_proc(data, fs, br, limits):
     a_mat = np.linalg.pinv(o1) @ o2
     # Output matrix C
     c_mat = obs[:n_ch, :]
-
-    # plot frequency response
-    # Assume B is an identity matrix with appropriate dimensions
-    b_mat = np.eye(a_mat.shape[0])
-    # Assume D is a zero matrix with appropriate dimensions
-    d_mat = np.zeros((c_mat.shape[0], b_mat.shape[1]))
-    # Create the state-space system
-    sys = control.ss(a_mat, b_mat, c_mat, d_mat, dt=1/fs)
-    # plot FRF
-    lines = control.bode_plot(sys, np.linspace(0, 2*np.pi*100, 100), dB=True, Hz=True, plot=True)
-    # Plot the Bode diagram
-    # fig = plt.figure()
-    # ax = fig.add_subplot(111)
-    # ax.add_line(lines)
-    # plt.show()
     # The eigenvalues of the system matrix determine the natural frequencies and the damping
     [mu, psi] = np.linalg.eig(a_mat)
     var_lambda = np.log(mu) * fs
@@ -108,11 +91,6 @@ def ssi_proc(data, fs, br, limits):
     # The eigenvector together with the output matrix C determine the mode shapes
     phi = c_mat @ psi  # each column contains one mode shape
 
-    # Filter unstable poles/modes
-    for i in range(len(freqs)):
-        f_i = freqs[i]
-        z_i = zeta[i]
-        m_i = phi[:, i]
-
     # Return modal parameters
+    print("Stochastic Subspace Identification complete...")
     return freqs, zeta, phi
