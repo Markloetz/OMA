@@ -1,20 +1,22 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from OMA import OMA_Module as oma
-import scipy
 
 if __name__ == '__main__':
     # Specify Sampling frequency
     Fs = 2048
 
     # Threshold for MAC
-    mac_threshold = 0.85
+    mac_threshold = 0.6
+
+    # Decide if harmonic filtering is active
+    filt = False
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename='Data/DataPlateHarmonicInfluence/acc_data_01_09_12_33_harmonic_22_5Hz.csv',
+    acc, Fs = oma.import_data(filename="Data/acc_data_300524_total.csv",
                               plot=False,
                               fs=Fs,
-                              time=180,
+                              time=300,
                               detrend=True,
                               downsample=False,
                               cutoff=100)
@@ -22,15 +24,18 @@ if __name__ == '__main__':
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc,
                                     fs=Fs,
-                                    zero_padding=True)
+                                    zero_padding=False,
+                                    n_seg=4,
+                                    window='hamming',
+                                    overlap=0.25)
 
     # SVD of CPSD-matrix @ each frequency
     S, U, S2, U2 = oma.fdd.sv_decomp(mCPSD)
 
     # Eliminate harmonic frequency bands (cut out harmonic peaks and interpolate)
-    # find harmonic frequency ranges
-    f_harmonic = oma.fdd.harmonic_est(data=acc, delta_f=0.2, f_max=100, fs=Fs, plot=False)
-    S = oma.fdd.eliminate_harmonic(vf, S, f_harmonic)
+    if filt:
+        f_harmonic = oma.fdd.harmonic_est(data=acc, delta_f=0.2, f_max=100, fs=Fs, plot=True)
+        S = oma.fdd.eliminate_harmonic(vf, S, f_harmonic)
 
     # Peak-picking
     fPeaks, Peaks, nPeaks = oma.fdd.peak_picking(vf, 20 * np.log10(S), 20 * np.log10(S2), n_sval=1)
@@ -68,8 +73,8 @@ if __name__ == '__main__':
         fSDOF_temp_2 = fSDOF_temp_1[~np.isnan(fSDOF_temp_1)]
         sSDOF_temp_2 = sSDOF_temp_1[~np.isnan(sSDOF_temp_1)]
         color = ((nPeaks - i) / nPeaks, (i + 1) / nPeaks, 0.5, 1)
-        plt.plot(fSDOF_temp_2, sSDOF_temp_2, color=color)
-    plt.plot(fPeaks, Peaks, marker='o', linestyle='none')
+        plt.plot(fSDOF_temp_2, 20*np.log10(sSDOF_temp_2), color=color)
+    plt.plot(fPeaks, 20*np.log10(Peaks), marker='o', linestyle='none')
     plt.xlabel('Frequency')
     plt.ylabel('Singular Values')
     plt.title('Singular Value Plot')
@@ -88,18 +93,18 @@ if __name__ == '__main__':
 
     # Plot Fitted SDOF-Bell Functions
     # fdd.plot_fit(fSDOF, sSDOF, wn, zeta)
+    ms = oma.modeshape_scaling(np.abs(PHI))
     for i in range(nPeaks):
-        ms = oma.modeshape_scaling(PHI[i, :].real)
-        plt.plot(ms, label="Mode: " + str(i + 1))
+        plt.plot(np.real(PHI[i, :]), label="Mode: " + str(i + 1))
     plt.legend()
-    plt.show
+    plt.show()
     # Plot mode shapes
-    mode = np.zeros((nPeaks, 38))
-    for i in range(nPeaks):
-        mode_locs = np.array([0, 8, 11, 32])
-        mode[i, mode_locs] = PHI[i, :].real
-    discretization = scipy.io.loadmat('Discretizations/PlateHoleDiscretization.mat')
-    N = discretization['N']
-    E = discretization['E']
-    for i in range(nPeaks):
-        oma.plot_modeshape(N, E, mode[i, :])
+    # mode = np.zeros((nPeaks, 38))
+    # for i in range(nPeaks):
+    #     mode_locs = np.array([0, 8, 11, 32])
+    #     mode[i, mode_locs] = PHI[i, :].real
+    # discretization = scipy.io.loadmat('Discretizations/PlateHoleDiscretization.mat')
+    # N = discretization['N']
+    # E = discretization['E']
+    # for i in range(nPeaks):
+    #     oma.plot_modeshape(N, E, mode[i, :])

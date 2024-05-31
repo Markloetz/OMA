@@ -79,8 +79,9 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
 
     # find platykurtic frequencies and sort them
     idx_bad = []
+    kurtosis_mean = kurtosis_mean-np.mean(kurtosis_mean)
     for i in range(1, n_filt):
-        if kurtosis_mean[i] < np.min(kurtosis_mean) / 3:
+        if kurtosis_mean[i] <= np.min(kurtosis_mean) / 3:
             idx_bad.append(i)
 
     # Store indices of "harmonic groups" in array
@@ -170,7 +171,7 @@ def eliminate_harmonic(f, s, f_range):
     return s
 
 
-def cpsd_matrix(data, fs, zero_padding=True):
+def cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=0.5):
     # get dimensions
     n_rows, n_cols = data.shape
 
@@ -191,10 +192,8 @@ def cpsd_matrix(data, fs, zero_padding=True):
     # n_overlap = np.floor(n_per_seg*0.5)
     # window = 'hann'
     # CSPD-Parameters (Matlab-Style) -> very good for fitting
-    window = 'hamming'
-    n_seg = 18
     n_per_seg = np.floor(n_rows / n_seg)  # divide into 8 segments
-    n_overlap = np.floor(0 * n_per_seg)  # Matlab uses zero overlap
+    n_overlap = np.floor(overlap * n_per_seg)  # Matlab uses zero overlap
 
     # preallocate cpsd-matrix and frequency vector
     n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed

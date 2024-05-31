@@ -234,6 +234,10 @@ def plot_modeshape(N, E, mode_shape):
 
 
 def modeshape_scaling(ms):
-    max_ms = np.max(np.abs(ms))
-    ms_scaled = ms / max_ms
-    return ms_scaled - ms_scaled[0]
+    ms_out = np.zeros(ms.shape)
+    max_ms = np.zeros(ms.shape[0])
+    for i in range(ms.shape[0]):
+        max_ms[i] = np.max(np.abs(ms[i, :]))
+    max_tot = np.max(max_ms)
+    ms_out = ms/max_tot
+    return ms_out

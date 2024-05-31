@@ -7,7 +7,7 @@ if __name__ == "__main__":
     Fs = 2048
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename='Data/NoiseFloorEstimation/acc_data_270524_4507.csv',
+    acc, Fs = oma.import_data(filename="Data/MCI_Measurement_Room493/acc_data_300524_randomWalk.csv",
                               plot=True,
                               fs=Fs,
                               time=180,
