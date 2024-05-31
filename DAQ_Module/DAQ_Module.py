@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 import nidaqmx
+import scipy
 from nidaqmx.constants import (AcquisitionType, AccelSensitivityUnits, AccelUnits)
 from scipy.signal import butter, filtfilt
 import nidaqmx.stream_writers
@@ -152,6 +153,12 @@ def plot_data(data, sample_rate):
 
 
 def save_to_csv(data, filename):
-    print('Writing data to '+filename+'...')
+    print('Writing data to ' + filename + '...')
     np.savetxt(filename, data, delimiter=',', header='', comments='')
+    print('Data stored succesfully!')
+
+
+def save_to_mat(data, filename):
+    print('Writing data to ' + filename + '...')
+    scipy.io.savemat(filename, {'acc': data})
     print('Data stored succesfully!')

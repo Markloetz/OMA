@@ -10,10 +10,21 @@ from matplotlib import cm, colors, tri
 def import_data(filename, plot, fs, time, detrend, downsample, cutoff=1000):
     # notify user
     print("Data import started...")
-    with open(filename, 'r') as f:
-        reader = csv.reader(f)
-        data = list(reader)
-    data = np.array(data, dtype=float)
+    # load data
+    fileending = filename[-3:]
+    if fileending == 'csv' or fileending == 'txt':
+        with open(filename, 'r') as f:
+            reader = csv.reader(f)
+            data = list(reader)
+        data = np.array(data, dtype=float)
+    elif fileending == 'mat':
+        # Load the .mat file
+        loaded_data = scipy.io.loadmat(filename)
+        # Extract the array from the loaded data
+        data = loaded_data['acc']
+    else:
+        return -1
+    # time vector for plot
     if time < (data.shape[0] / fs):
         data = data[:int(fs * time), :]
         t_vec = np.linspace(0, time, int(time * fs))

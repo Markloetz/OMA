@@ -13,10 +13,10 @@ if __name__ == '__main__':
     filt = False
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename="Data/acc_data_300524_total.csv",
+    acc, Fs = oma.import_data(filename="Data/testData.mat",
                               plot=False,
                               fs=Fs,
-                              time=300,
+                              time=5,
                               detrend=True,
                               downsample=False,
                               cutoff=100)

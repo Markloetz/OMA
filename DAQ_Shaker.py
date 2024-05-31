@@ -7,7 +7,7 @@ if __name__ == "__main__":
     sensitivities = [1.016, 1.036, 1.060, 1.008]  # mv/ms^-2
     duration = 180
     sample_rate = 2048
-    csv_filename = "Data/ShakerOMA/acc_data_01_09_12_33_harmonic_22.5Hz.csv"
+    mat_filename = "Data/ShakerOMA/acc_data_01_09_12_33_harmonic_22.5Hz.mat"
 
     acc_data = daq.daq_oma_shaker(device_in=device_in,
                                   device_out=device_out,
@@ -16,5 +16,5 @@ if __name__ == "__main__":
                                   fs=sample_rate,
                                   acc_sensitivities=sensitivities,
                                   harmonic_freq=22.5)
-    daq.save_to_csv(acc_data, csv_filename)
+    daq.save_to_mat(acc_data, mat_filename)
     daq.plot_data(acc_data, sample_rate)
