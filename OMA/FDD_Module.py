@@ -252,6 +252,12 @@ def prominence_adjust(x, y):
     x_data = x[locs]
     line, = ax.plot(x_data, y_data, 'bo')
 
+    # Adjust limits
+    idx = np.where(x == 100)[0][0]
+    limlow = np.min(y[:idx])-(np.max(y[:idx])-np.min(y[:idx]))*0.1
+    limhigh = np.max(y[:idx])+(np.max(y[:idx])-np.min(y[:idx]))*0.1
+    ax.set_ylim([limlow, limhigh])
+
     # Add a slider
     ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
     slider = Slider(ax_slider, 'Peak Prominence', min_prominence, max_prominence, valinit=min_prominence)
@@ -290,7 +296,11 @@ def peak_picking(x, y, y2, n_sval=1):
     # Create a figure and axis
     figure, ax = plt.subplots()
     ax.set_xlim([0, 100])
-
+    # Adjust limits
+    idx = np.where(x == 100)[0][0]
+    limlow = np.min(y[:idx])-(np.max(y[:idx])-np.min(y[:idx]))*0.1
+    limhigh = np.max(y[:idx])+(np.max(y[:idx])-np.min(y[:idx]))*0.1
+    ax.set_ylim([limlow, limhigh])
     # Store the selected points
     selected_points = {'x': [], 'y': []}
 
@@ -326,9 +336,6 @@ def peak_picking(x, y, y2, n_sval=1):
     if n_sval > 1:
         ax.plot(x, (y2 * scaling), linewidth=0.7, color='black')
     ax.plot(x_data, y_data, 'bo')  # Plot the data points in blue
-    # vertical lines at suspected harmonic frequencies
-    # for i in range(x_vert.shape[0]):
-    #     ax.axvline(x_vert[i], color=[0, 0, 0])
     ax.set_title('Click to select points')
     ax.set_xlabel('f (Hz)')
     ax.set_ylabel('Singular Values (dB)')
@@ -510,3 +517,4 @@ def plot_fit(fSDOF, sSDOF, wn, zeta):
 
         # Show the plot
         plt.show()
+        

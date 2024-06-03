@@ -5,6 +5,7 @@ import scipy
 from nidaqmx.constants import (AcquisitionType, AccelSensitivityUnits, AccelUnits)
 from scipy.signal import butter, filtfilt
 import nidaqmx.stream_writers
+import time
 
 
 def generate_bandlimited_white_noise(duration, sample_rate, cut_low=5, cut_high=500, ramp_duration=2):
@@ -94,6 +95,12 @@ def daq_oma_shaker(device_in, device_out, channels, duration, fs, acc_sensitivit
         acc_task.start()
         acc_data = acc_task.read(number_of_samples_per_channel=(duration + 4) * fs, timeout=duration + 4)
 
+        # print time
+        t_start = time.time()
+        t_cur = 0
+        while (t_cur-t_start) < duration:
+            print(t_cur-t_start)
+
         # Stop everything
         out_task.stop()
         acc_task.stop()
@@ -124,6 +131,14 @@ def daq_oma(device_in, channels, duration, fs, acc_sensitivities):
         # record accelerations
         acc_task.start()
         print('DAQ Start')
+        # print time
+        t_start = time.time()
+        t_cur = 0
+        while (t_cur-t_start) < duration:
+            time.sleep(1)
+            t_cur = time.time()
+            t_elapsed = t_cur-t_start
+            print(int(t_elapsed), end='\r')
         acc_data = acc_task.read(number_of_samples_per_channel=(duration + 4) * fs, timeout=duration + 4)
 
         # Stop everything

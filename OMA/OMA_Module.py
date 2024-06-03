@@ -5,6 +5,8 @@ import csv
 import scipy
 import matplotlib.pyplot as plt
 from matplotlib import cm, colors, tri
+import glob
+import os
 
 
 def import_data(filename, plot, fs, time, detrend, downsample, cutoff=1000):
@@ -252,3 +254,53 @@ def modeshape_scaling(ms):
     max_tot = np.max(max_ms)
     ms_out = ms/max_tot
     return ms_out
+
+
+def modescale(path, Fs, n_rov, n_ref, ref_channel, t_meas, fPeaks, Peaks, window, overlap, n_seg, zeropadding):
+    # import data and store in one large array
+    # preallocate
+    n_files = len([name for name in os.listdir(path)])
+    data = np.zeros((int(t_meas * Fs), n_files * (n_rov + n_ref)))
+    for i, filename in enumerate(glob.glob(os.path.join(path, '*.mat'))):
+        data[:, i * (n_rov + n_ref):(i + 1) * (n_rov + n_ref)], _ = import_data(filename=filename,
+                                                                                    plot=False,
+                                                                                    fs=Fs,
+                                                                                    time=t_meas,
+                                                                                    detrend=False,
+                                                                                    downsample=False,
+                                                                                    cutoff=Fs//2)
+    # calculate and plot spectral densities of reference signals to scale them accordingly
+    nPeaks = len(fPeaks)
+    ref_modes = np.zeros((n_files, nPeaks), dtype=np.complex_)
+    alpha = np.zeros((n_files*n_rov, nPeaks), dtype=np.complex_)
+    # loop over each dataset
+    for i in range(n_files):
+        mCPSD, vf = fdd.cpsd_matrix(data=data[:, i * (n_rov + n_ref):(i + 1) * (n_rov + n_ref)],
+                                    fs=Fs,
+                                    zero_padding=zeropadding,
+                                    n_seg=n_seg,
+                                    window=window,
+                                    overlap=overlap)
+        # SVD of CPSD-matrix @ each frequency
+        S, U, S2, U2 = fdd.sv_decomp(mCPSD)
+
+        # extract mode shapes at selected peaks for each dataset
+        _, mPHI = U.shape
+        PHI = np.zeros((nPeaks, mPHI), dtype=np.complex_)
+        for j in range(nPeaks):
+            PHI[j, :] = U[np.where(vf == fPeaks[j]), :]
+        
+        # reference mode for each natural frequency
+        ref_modes[i, :] = PHI[:, ref_channel]
+
+    # calculate scaling factor alpha for each dataset and each peak
+    for i in range(n_files):
+        for j in range(nPeaks):
+            # modal amplitude of dataset i and frequency j
+            amp = ref_modes[i, j]
+            # reference amplitude from dataset 0 and frequency j
+            amp_ref = ref_modes[0, j]
+            # scaling factor
+            alpha[i*n_rov:i*n_rov+n_rov, j] = amp/amp_ref
+    return alpha.T      
+    # print(alpha)

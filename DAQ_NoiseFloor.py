@@ -1,7 +1,7 @@
 from DAQ_Module import DAQ_Module as daq
 
 if __name__ == "__main__":
-    device_in = "cDAQ2Mod1"
+    device_in = "cDAQ1Mod1"
     channels = [0, 1]
     sensitivities = [100.93, 100.73]  # mv/ms^-2
     duration = 5

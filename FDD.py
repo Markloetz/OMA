@@ -1,22 +1,36 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy
 from OMA import OMA_Module as oma
 
 if __name__ == '__main__':
     # Specify Sampling frequency
     Fs = 2048
 
+    # measurement duration
+    t_end = 500
+
     # Threshold for MAC
-    mac_threshold = 0.6
+    mac_threshold = 0.7
 
     # Decide if harmonic filtering is active
-    filt = False
+    filt = True
+
+    # Decide if the modes need to be scaled (and where to find the data for scaling)
+    scaling = True
+    path = "Data/SDL_Floor/"
+
+    # Welch's Method Parameters
+    window = 'hann'
+    n_seg = 100
+    overlap = 0.5
+    zero_padding = False
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename="Data/testData.mat",
+    acc, Fs = oma.import_data(filename="Data/SDL_FloorTotal.mat",
                               plot=False,
                               fs=Fs,
-                              time=5,
+                              time=t_end,
                               detrend=True,
                               downsample=False,
                               cutoff=100)
@@ -24,10 +38,10 @@ if __name__ == '__main__':
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc,
                                     fs=Fs,
-                                    zero_padding=False,
-                                    n_seg=4,
-                                    window='hamming',
-                                    overlap=0.25)
+                                    zero_padding=zero_padding,
+                                    n_seg=n_seg,
+                                    window=window,
+                                    overlap=overlap)
 
     # SVD of CPSD-matrix @ each frequency
     S, U, S2, U2 = oma.fdd.sv_decomp(mCPSD)
@@ -81,30 +95,43 @@ if __name__ == '__main__':
     plt.grid(True)
     plt.show()
 
+    # Scaling the modeshapes
+    alpha = oma.modescale(path=path,
+                Fs=Fs,
+                n_rov=2,
+                n_ref=1,
+                ref_channel=2,
+                t_meas=t_end,
+                fPeaks=fPeaks,
+                Peaks=Peaks,
+                window=window,
+                overlap=overlap,
+                n_seg=n_seg,
+                zeropadding=zero_padding)  
+    if not scaling:
+        alpha = np.ones(alpha.shape)
+    
+    PHI = PHI*alpha
+    print(alpha.real)
     # Fitting SDOF in frequency domain
     wn = np.zeros((nPeaks, 1))
     zeta = np.zeros((nPeaks, 1))
     for i in range(nPeaks):
-        # wn[i, :], zeta[i, :] = fdd.sdof_half_power(fSDOF[:, i], sSDOF[:, i], fPeaks[i])
         wn[i, :], zeta[i, :] = oma.fdd.sdof_time_domain_fit(sSDOF[:, i], vf, Fs, n_skip=0, n_peaks=30)
     # Print Damping and natural frequencies
     print(wn / 2 / np.pi)
     print(zeta)
 
-    # Plot Fitted SDOF-Bell Functions
-    # fdd.plot_fit(fSDOF, sSDOF, wn, zeta)
+    # 2d-Plot modeshapes
     ms = oma.modeshape_scaling(np.abs(PHI))
     for i in range(nPeaks):
         plt.plot(np.real(PHI[i, :]), label="Mode: " + str(i + 1))
     plt.legend()
     plt.show()
-    # Plot mode shapes
-    # mode = np.zeros((nPeaks, 38))
-    # for i in range(nPeaks):
-    #     mode_locs = np.array([0, 8, 11, 32])
-    #     mode[i, mode_locs] = PHI[i, :].real
-    # discretization = scipy.io.loadmat('Discretizations/PlateHoleDiscretization.mat')
-    # N = discretization['N']
-    # E = discretization['E']
-    # for i in range(nPeaks):
-    #     oma.plot_modeshape(N, E, mode[i, :])
+    
+    # 3d-Plot mode shapes
+    discretization = scipy.io.loadmat('Discretizations/SDL_Floor.mat')
+    N = discretization['N']
+    E = discretization['E']
+    for i in range(nPeaks):
+        oma.plot_modeshape(N, E+1, PHI[i, :].real)
