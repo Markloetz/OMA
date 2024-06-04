@@ -8,7 +8,7 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Cutoff frequency (band of interest)
-    cutoff = 200
+    cutoff = 100
 
     # measurement duration
     t_end = 500
@@ -21,7 +21,7 @@ if __name__ == '__main__':
 
     # Decide if the modes need to be scaled (and where to find the data for scaling)
     scaling = True
-    path = "Data/SDL_Floor/"
+    path = "Data/TiflisBruecke/"
 
     # Welch's Method Parameters
     window = 'hann'
@@ -30,7 +30,7 @@ if __name__ == '__main__':
     zero_padding = False
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename="Data/SDL_FloorTotal.mat",
+    acc, Fs = oma.import_data(filename="Data/TiflisTotal.mat",
                               plot=False,
                               fs=Fs,
                               time=t_end,

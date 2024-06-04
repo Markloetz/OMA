@@ -5,7 +5,7 @@ import os
 from DAQ_Module import DAQ_Module as daq
 
 if __name__ == '__main__':
-    path = "Data/SDL_Floor/"
+    path = "Data/TiflisBruecke/"
     Fs = 2048  # [Hz]
     t_meas = 500  # [s]
     n_rov = 2  # number of roving sensors
@@ -34,4 +34,4 @@ if __name__ == '__main__':
             data_out[:, j] = col
             j = j+1
 
-    daq.save_to_mat(data_out, "Data/SDL_FloorTotal.mat")
+    daq.save_to_mat(data_out, "Data/TiflisTotal.mat")
