@@ -79,9 +79,13 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
 
     # find platykurtic frequencies and sort them
     idx_bad = []
-    kurtosis_mean = kurtosis_mean-np.mean(kurtosis_mean)
-    for i in range(1, n_filt):
-        if kurtosis_mean[i] <= np.min(kurtosis_mean) / 3:
+    # kurtosis_mean = kurtosis_mean-np.mean(kurtosis_mean)
+    kurtosis_diff = np.zeros((n_filt-1, 1))
+    # np.diff not working here for whatever reason
+    for i in range(kurtosis_diff.shape[0]):
+        kurtosis_diff[i] = kurtosis_mean[i+1]-kurtosis_mean[i]
+    for i in range(1, kurtosis_diff.shape[0]):
+        if kurtosis_diff[i] <= np.min(kurtosis_diff) / 3:
             idx_bad.append(i)
 
     # Store indices of "harmonic groups" in array
@@ -108,9 +112,9 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
     return harmonic_f
 
 
-def eliminate_harmonic(f, s, f_range):
+def eliminate_harmonic(f, s, f_range, cutoff=100):
     figure, ax = plt.subplots()
-    ax.set_xlim([0, 100])
+    ax.set_xlim([0, cutoff])
     ax.set_ylim([-np.max(np.abs(20 * np.log10(s))) * 1.1, np.max(20 * np.log10(s)) * 0.9])
     ax.set_xlabel('f (Hz)')
     ax.set_ylabel('Singular Values (dB)')
@@ -155,7 +159,7 @@ def eliminate_harmonic(f, s, f_range):
 
     # plot singular values w.o. harmonic peaks
     figure, ax = plt.subplots()
-    ax.set_xlim([0, 100])
+    ax.set_xlim([0, cutoff])
     ax.set_ylim([-np.max(np.abs(20 * np.log10(s))) * 1.1, np.max(20 * np.log10(s)) * 0.9])
     ax.set_xlabel('f (Hz)')
     ax.set_ylabel('Singular Values (dB)')
@@ -238,7 +242,7 @@ def sv_decomp(mat):
     return s1, u1, s2, u2
 
 
-def prominence_adjust(x, y):
+def prominence_adjust(x, y, cutoff):
     # Adjusting peak-prominence with slider
     min_prominence = abs(max(y) / 100)
     max_prominence = abs(max(y))
@@ -253,7 +257,7 @@ def prominence_adjust(x, y):
     line, = ax.plot(x_data, y_data, 'bo')
 
     # Adjust limits
-    idx = np.where(x == 100)[0][0]
+    idx = np.where(x == cutoff)[0][0]
     limlow = np.min(y[:idx])-(np.max(y[:idx])-np.min(y[:idx]))*0.1
     limhigh = np.max(y[:idx])+(np.max(y[:idx])-np.min(y[:idx]))*0.1
     ax.set_ylim([limlow, limhigh])
@@ -277,27 +281,29 @@ def prominence_adjust(x, y):
     ax.plot(x, y)
     ax.set_xlabel('f (Hz)')
     ax.set_ylabel('Singular Values (dB)')
-    ax.set_xlim([0, 100])
+    ax.set_xlim([0, cutoff])
     plt.show()
 
     return SliderValClass.slider_val
 
 
-def peak_picking(x, y, y2, n_sval=1):
+def peak_picking(x, y, y2, n_sval=1, cutoff=100):
     y = y.ravel()
     y2 = y2.ravel()
     x = x.ravel()
 
     # get prominence
-    locs, _ = scipy.signal.find_peaks(y, prominence=(prominence_adjust(x, y), None), distance=np.ceil(len(x) / 1000))
+    locs, _ = scipy.signal.find_peaks(y,
+                                      prominence=(prominence_adjust(x, y, cutoff=cutoff), None),
+                                      distance=np.ceil(len(x) / 1000))
     y_data = y[locs]
     x_data = x[locs]
     # Peak Picking
     # Create a figure and axis
     figure, ax = plt.subplots()
-    ax.set_xlim([0, 100])
+    ax.set_xlim([0, cutoff])
     # Adjust limits
-    idx = np.where(x == 100)[0][0]
+    idx = np.where(x == cutoff)[0][0]
     limlow = np.min(y[:idx])-(np.max(y[:idx])-np.min(y[:idx]))*0.1
     limhigh = np.max(y[:idx])+(np.max(y[:idx])-np.min(y[:idx]))*0.1
     ax.set_ylim([limlow, limhigh])

@@ -7,6 +7,9 @@ if __name__ == '__main__':
     # Specify Sampling frequency
     Fs = 2048
 
+    # Cutoff frequency (band of interest)
+    cutoff = 200
+
     # measurement duration
     t_end = 500
 
@@ -14,7 +17,7 @@ if __name__ == '__main__':
     mac_threshold = 0.7
 
     # Decide if harmonic filtering is active
-    filt = True
+    filt = False
 
     # Decide if the modes need to be scaled (and where to find the data for scaling)
     scaling = True
@@ -33,7 +36,7 @@ if __name__ == '__main__':
                               time=t_end,
                               detrend=True,
                               downsample=False,
-                              cutoff=100)
+                              cutoff=cutoff)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc,
@@ -48,11 +51,11 @@ if __name__ == '__main__':
 
     # Eliminate harmonic frequency bands (cut out harmonic peaks and interpolate)
     if filt:
-        f_harmonic = oma.fdd.harmonic_est(data=acc, delta_f=0.2, f_max=100, fs=Fs, plot=True)
+        f_harmonic = oma.fdd.harmonic_est(data=acc, delta_f=0.25, f_max=cutoff, fs=Fs, plot=True)
         S = oma.fdd.eliminate_harmonic(vf, S, f_harmonic)
 
     # Peak-picking
-    fPeaks, Peaks, nPeaks = oma.fdd.peak_picking(vf, 20 * np.log10(S), 20 * np.log10(S2), n_sval=1)
+    fPeaks, Peaks, nPeaks = oma.fdd.peak_picking(vf, 20 * np.log10(S), 20 * np.log10(S2), n_sval=1, cutoff=cutoff)
 
     # extract mode shape at each peak
     _, mPHI = U.shape
@@ -87,8 +90,8 @@ if __name__ == '__main__':
         fSDOF_temp_2 = fSDOF_temp_1[~np.isnan(fSDOF_temp_1)]
         sSDOF_temp_2 = sSDOF_temp_1[~np.isnan(sSDOF_temp_1)]
         color = ((nPeaks - i) / nPeaks, (i + 1) / nPeaks, 0.5, 1)
-        plt.plot(fSDOF_temp_2, 20*np.log10(sSDOF_temp_2), color=color)
-    plt.plot(fPeaks, 20*np.log10(Peaks), marker='o', linestyle='none')
+        plt.plot(fSDOF_temp_2, 20 * np.log10(sSDOF_temp_2), color=color)
+    plt.plot(fPeaks, 20 * np.log10(Peaks), marker='o', linestyle='none')
     plt.xlabel('Frequency')
     plt.ylabel('Singular Values')
     plt.title('Singular Value Plot')
@@ -97,30 +100,31 @@ if __name__ == '__main__':
 
     # Scaling the modeshapes
     alpha = oma.modescale(path=path,
-                Fs=Fs,
-                n_rov=2,
-                n_ref=1,
-                ref_channel=2,
-                t_meas=t_end,
-                fPeaks=fPeaks,
-                Peaks=Peaks,
-                window=window,
-                overlap=overlap,
-                n_seg=n_seg,
-                zeropadding=zero_padding)  
+                          Fs=Fs,
+                          n_rov=2,
+                          n_ref=1,
+                          ref_channel=2,
+                          t_meas=t_end,
+                          fPeaks=fPeaks,
+                          Peaks=Peaks,
+                          window=window,
+                          overlap=overlap,
+                          n_seg=n_seg,
+                          zeropadding=zero_padding)
     if not scaling:
         alpha = np.ones(alpha.shape)
-    
-    PHI = PHI*alpha
-    print(alpha.real)
+    PHI = PHI * alpha
+
     # Fitting SDOF in frequency domain
     wn = np.zeros((nPeaks, 1))
     zeta = np.zeros((nPeaks, 1))
     for i in range(nPeaks):
         wn[i, :], zeta[i, :] = oma.fdd.sdof_time_domain_fit(sSDOF[:, i], vf, Fs, n_skip=0, n_peaks=30)
     # Print Damping and natural frequencies
+    print("Natural Frequencies [Hz]:")
     print(wn / 2 / np.pi)
-    print(zeta)
+    print("Damping [%]:")
+    print(zeta*100)
 
     # 2d-Plot modeshapes
     ms = oma.modeshape_scaling(np.abs(PHI))
@@ -128,10 +132,13 @@ if __name__ == '__main__':
         plt.plot(np.real(PHI[i, :]), label="Mode: " + str(i + 1))
     plt.legend()
     plt.show()
-    
+
     # 3d-Plot mode shapes
     discretization = scipy.io.loadmat('Discretizations/SDL_Floor.mat')
     N = discretization['N']
     E = discretization['E']
     for i in range(nPeaks):
-        oma.plot_modeshape(N, E+1, PHI[i, :].real)
+        oma.plot_modeshape(N,
+                           E + 1,
+                           PHI[i, :].real,
+                           title="Mode " + str(i+1) + " at " + str(round(wn[i, :][0] / 2 / np.pi, 2)) + "Hz")

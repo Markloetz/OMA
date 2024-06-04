@@ -138,7 +138,7 @@ def mps(data, fs):
     plt.show()
 
 
-def plot_modeshape(N, E, mode_shape):
+def plot_modeshape(N, E, mode_shape, title):
     # scale mode shapes according to the size of the object
     x_diff = np.max(N[:, 0]) - np.min(N[:, 0])
     y_diff = np.max(N[:, 1]) - np.min(N[:, 1])
@@ -196,6 +196,8 @@ def plot_modeshape(N, E, mode_shape):
     # Create a 3D plot
     fig = plt.figure()
     ax = fig.add_subplot(111, projection='3d')
+    # Title
+    ax.set_title(title)
     # Make the norm
     norm = colors.Normalize(vmin=np.min(N[:, 2]), vmax=np.max(N[:, 2]), clip=False)
     # Create symmetric colormap
