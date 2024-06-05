@@ -39,6 +39,12 @@ def import_data(filename, plot, fs, time, detrend, downsample, cutoff=1000):
     if detrend:
         for i in range(n_cols):
             data[:, i] = scipy.signal.detrend(data[:, i])
+
+    # Normalizing data:
+    # for i in range(n_cols):
+    #     data[:, i] = data[:, i]/data[:, i].std()
+
+
     # Downsampling
     fs_new = fs
     if downsample:
@@ -143,11 +149,12 @@ def plot_modeshape(N, E, mode_shape, title):
     x_diff = np.max(N[:, 0]) - np.min(N[:, 0])
     y_diff = np.max(N[:, 1]) - np.min(N[:, 1])
     longest_dim = np.max([x_diff, y_diff])
-    mode_shape = mode_shape / np.max(np.abs(mode_shape)) * (longest_dim / 12)
+    mode_shape = mode_shape / np.max(np.abs(mode_shape)) * (longest_dim / 15)
+
 
     # Write the mode shape (z-coordinates) into the node vector
     N_temp = np.zeros((N.shape[0], N.shape[1] + 1))
-    N_temp[:, 2] = np.abs(mode_shape)
+    N_temp[:, 2] = mode_shape
     N_temp[:, :2] = N
     N = N_temp
 

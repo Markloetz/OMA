@@ -184,7 +184,7 @@ def cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=
 
     # Zero padding
     if zero_padding:
-        n_padding = 2
+        n_padding = 5
         buffer = np.zeros((n_rows * n_padding, n_cols))
         buffer[:n_rows, :] = data
         data = buffer
@@ -257,7 +257,7 @@ def prominence_adjust(x, y, cutoff):
     line, = ax.plot(x_data, y_data, 'bo')
 
     # Adjust limits
-    idx = np.where(x == cutoff)[0][0]
+    idx = np.where(x >= cutoff)[0][0]
     limlow = np.min(y[:idx])-(np.max(y[:idx])-np.min(y[:idx]))*0.1
     limhigh = np.max(y[:idx])+(np.max(y[:idx])-np.min(y[:idx]))*0.1
     ax.set_ylim([limlow, limhigh])
@@ -303,7 +303,7 @@ def peak_picking(x, y, y2, n_sval=1, cutoff=100):
     figure, ax = plt.subplots()
     ax.set_xlim([0, cutoff])
     # Adjust limits
-    idx = np.where(x == cutoff)[0][0]
+    idx = np.where(x >= cutoff)[0][0]
     limlow = np.min(y[:idx])-(np.max(y[:idx])-np.min(y[:idx]))*0.1
     limhigh = np.max(y[:idx])+(np.max(y[:idx])-np.min(y[:idx]))*0.1
     ax.set_ylim([limlow, limhigh])
@@ -474,13 +474,17 @@ def sdof_time_domain_fit(y, f, fs, n_skip=3, n_peaks=30):
         n_peaks = len(minmax) - n_skip
     minmax_fit = np.array([minmax[_a] for _a in range(n_skip, n_skip + n_peaks)])
     minmax_fit_idx = np.array([minmax_idx[_a] for _a in range(n_skip, n_skip + n_peaks)])
-    # plot the minima and maxima over the free decay
-    plt.plot(t, sdof_corr)
-    plt.plot(t[minmax_fit_idx], minmax_fit)
-    plt.grid(visible=True, which='minor')
-    plt.show()
     # natural frequency estimation
     fn_est = 1 / np.mean(np.diff(t[minmax_fit_idx]) * 2)
+    # plot the minima and maxima over the free decay
+    if True:
+        plt.plot(t, sdof_corr, label='Autocorrelation of SDOF bell at '+str(fn_est)+' Hz')
+        # plt.plot(t[minmax_fit_idx], minmax_fit)
+        plt.grid(visible=True, which='minor')
+        plt.xlabel('Time Delay (s)')
+        plt.ylabel('Normalized Amplitude ()')
+        plt.title('Autocorrelation of SDOF bell at '+str(round(fn_est, 2))+' Hz')
+        plt.show()
     # Fit damping ratio
     delta = np.array([2 * np.log(np.abs(minmax[0]) / np.abs(minmax[_i])) for _i in range(len(minmax_fit))])
 

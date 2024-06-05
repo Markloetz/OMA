@@ -8,7 +8,7 @@ if __name__ == '__main__':
     # main Parameters for mesh generation
     length = 42.8
     width = 5.75
-    n_rows = 6
+    n_rows = 8
     n_cols = 2
 
     # create node coordinates
@@ -16,8 +16,8 @@ if __name__ == '__main__':
     dist_l = length / (n_rows - 1)
     dist_w = width / (n_cols - 1)
     k = 0
-    for i in range(n_cols):
-        for j in range(n_rows):
+    for i in range(n_rows):
+        for j in range(n_cols):
             nodes[k, :] = np.array([dist_l * i, dist_w * j])
             k = k + 1
     # Center the origin
@@ -43,6 +43,8 @@ if __name__ == '__main__':
     for i in range(nodes.shape[0]):
         plt.plot(nodes[i, 0], nodes[i, 1], marker="$"+str(i+1)+"$", markersize=10, color="red")
     plt.show()
+
+    print(nodes)
 
     # store as .mat file in discretizations directory
     scipy.io.savemat(filename, {'N': nodes, 'E': elements})

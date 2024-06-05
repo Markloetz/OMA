@@ -14,7 +14,7 @@ if __name__ == '__main__':
     t_end = 500
 
     # Threshold for MAC
-    mac_threshold = 0.7
+    mac_threshold = 0.6
 
     # Decide if harmonic filtering is active
     filt = False
@@ -30,8 +30,8 @@ if __name__ == '__main__':
     zero_padding = False
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename="Data/TiflisTotal.mat",
-                              plot=False,
+    acc, Fs = oma.import_data(filename="Data/TiflisTotal_2.mat",
+                              plot=True,
                               fs=Fs,
                               time=t_end,
                               detrend=True,
@@ -66,13 +66,22 @@ if __name__ == '__main__':
     # calculate mac value @ each frequency for each peak
     nMAC, _ = S.shape
     mac_vec = np.zeros((nMAC, nPeaks), dtype=np.complex_)
+    # average modeshape
+    PHI_avg = np.zeros((nPeaks, mPHI), dtype=np.complex_)
     for i in range(nPeaks):
+        PHI_correlated = np.zeros((nMAC, mPHI), dtype=np.complex_)
         for j in range(nMAC):
             mac = oma.fdd.mac_calc(PHI[i, :], U[j, :])
             if mac.real < mac_threshold:
                 mac_vec[j, i] = 0
             else:
                 mac_vec[j, i] = mac
+                PHI_correlated[j, :] = U[j, :]
+
+        PHI_avg[i, :] = np.mean(PHI_correlated[np.where(PHI_correlated != 0)], axis=0)
+        print(PHI_avg[i, :])
+
+    PHI = PHI_avg
 
     # Filter the SDOFs
     # Find non-zero indices
@@ -92,9 +101,9 @@ if __name__ == '__main__':
         color = ((nPeaks - i) / nPeaks, (i + 1) / nPeaks, 0.5, 1)
         plt.plot(fSDOF_temp_2, 20 * np.log10(sSDOF_temp_2), color=color)
     plt.plot(fPeaks, 20 * np.log10(Peaks), marker='o', linestyle='none')
-    plt.xlabel('Frequency')
-    plt.ylabel('Singular Values')
-    plt.title('Singular Value Plot')
+    plt.xlabel('Frequency (Hz)')
+    plt.ylabel('Singular Values (dB)')
+    plt.title('Singular Values of SDOF Equivalents')
     plt.grid(True)
     plt.show()
 
@@ -115,6 +124,8 @@ if __name__ == '__main__':
         alpha = np.ones(alpha.shape)
     PHI = PHI * alpha
 
+    print(alpha)
+
     # Fitting SDOF in frequency domain
     wn = np.zeros((nPeaks, 1))
     zeta = np.zeros((nPeaks, 1))
@@ -127,18 +138,20 @@ if __name__ == '__main__':
     print(zeta*100)
 
     # 2d-Plot modeshapes
-    ms = oma.modeshape_scaling(np.abs(PHI))
     for i in range(nPeaks):
         plt.plot(np.real(PHI[i, :]), label="Mode: " + str(i + 1))
     plt.legend()
     plt.show()
 
     # 3d-Plot mode shapes
-    discretization = scipy.io.loadmat('Discretizations/SDL_Floor.mat')
+    discretization = scipy.io.loadmat('Discretizations/TiflisBruecke.mat')
     N = discretization['N']
     E = discretization['E']
+
     for i in range(nPeaks):
+        mode = np.zeros(PHI.shape[1]+4)
+        mode[2:-2] = PHI[i, :].real# -np.mean(PHI[i, :].real)
         oma.plot_modeshape(N,
                            E + 1,
-                           PHI[i, :].real,
+                           mode_shape=mode,
                            title="Mode " + str(i+1) + " at " + str(round(wn[i, :][0] / 2 / np.pi, 2)) + "Hz")
