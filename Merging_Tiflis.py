@@ -5,30 +5,37 @@ import os
 from DAQ_Module import DAQ_Module as daq
 
 
-def cut_hits(signal, threshold, length, fs):
-    indices = np.where(np.abs(signal) > threshold)[0]
-    groups = []
-    group_indices = []
-    current_group = []
-    current_group_index = []
-    for i, val in enumerate(indices):
-        if val != 0:
-            current_group.append(val)
-            current_group_index.append(i)
-        elif current_group:
-            groups.append(current_group)
-            group_indices.append(current_group_index)
-            current_group = []
-            current_group_index = []
-    # If the last group extends to the end of the array
-    if current_group:
-        groups.append(current_group)
-        group_indices.append(current_group_index)
+def exclude_windows(data, threshold, window_length):
+    # Find indices where data exceeds the threshold
+    peak_indices = np.where(np.abs(data) > threshold)[0]
 
-    for idx in group_indices:
-        signal[idx[0]:idx[0]+fs*length] = 0
+    # Initialize an empty list to store the data to be retained
+    exclude_mask = np.zeros_like(data, dtype=bool)
 
-    return signal
+    for idx in peak_indices:
+        # Determine the range to exclude, ensuring we do not go out of bounds
+        start_idx = idx
+        end_idx = min(idx + window_length, len(data))
+        exclude_mask[start_idx:end_idx] = True
+
+    # Invert the mask to find segments to retain
+    include_mask = ~exclude_mask
+    retained_data = data[include_mask]
+
+    # Calculate the amount of data needed to fill the gaps
+    required_length = len(data) - len(retained_data)
+
+    # If there is data to fill, repeat the retained data to fill the gaps
+    if required_length > 0:
+        fill_data = np.resize(retained_data, required_length)
+        final_data = np.concatenate([retained_data, fill_data])
+    else:
+        final_data = retained_data
+
+    # Ensure the final data is the same length as the original
+    final_data = final_data[:len(data)]
+
+    return final_data
 
 
 if __name__ == '__main__':
@@ -48,10 +55,11 @@ if __name__ == '__main__':
                                        plot=False,
                                        fs=Fs,
                                        time=t_meas,
-                                       detrend=False,
+                                       detrend=True,
                                        downsample=False,
                                        cutoff=Fs // 2)
-
+        # for j in range(data_temp.shape[1]):
+        #     data_temp[:, j] = exclude_windows(data_temp[:, j], data_temp[:, j].std()*3, Fs*2)
         data[:, i * (n_rov + n_ref):(i + 1) * (n_rov + n_ref)] = data_temp
 
     # Fill the merged data array

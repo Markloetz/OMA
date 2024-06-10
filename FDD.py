@@ -8,7 +8,7 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Cutoff frequency (band of interest)
-    cutoff = 100
+    cutoff = 50
 
     # measurement duration
     t_end = 500
@@ -26,12 +26,12 @@ if __name__ == '__main__':
     # Welch's Method Parameters
     window = 'hann'
     n_seg = 100
-    overlap = 0.5
+    overlap = 0
     zero_padding = False
 
     # import data (and plot)
     acc, Fs = oma.import_data(filename="Data/TiflisTotal_2.mat",
-                              plot=True,
+                              plot=False,
                               fs=Fs,
                               time=t_end,
                               detrend=True,
@@ -62,6 +62,7 @@ if __name__ == '__main__':
     PHI = np.zeros((nPeaks, mPHI), dtype=np.complex_)
     for i in range(nPeaks):
         PHI[i, :] = U[np.where(vf == fPeaks[i]), :]
+
     # EFDD-Procedure
     # calculate mac value @ each frequency for each peak
     nMAC, _ = S.shape
@@ -77,10 +78,7 @@ if __name__ == '__main__':
             else:
                 mac_vec[j, i] = mac
                 PHI_correlated[j, :] = U[j, :]
-
         PHI_avg[i, :] = np.mean(PHI_correlated[np.where(PHI_correlated != 0)], axis=0)
-        print(PHI_avg[i, :])
-
     PHI = PHI_avg
 
     # Filter the SDOFs
@@ -91,6 +89,9 @@ if __name__ == '__main__':
         indSDOF = oma.fdd.find_widest_range(mac_vec[:, i].real, np.where(vf == fPeaks[i])[0])
         fSDOF[indSDOF, i] = vf[indSDOF]
         sSDOF[indSDOF, i] = S[indSDOF, 0]
+        # Averaging correlating modeshapes
+        # PHI_correlated = U[indSDOF, :]
+        # PHI[i, :] = np.mean(PHI_correlated, axis=0)
 
     # Plotting the singular values
     for i in range(nPeaks):
@@ -107,25 +108,24 @@ if __name__ == '__main__':
     plt.grid(True)
     plt.show()
 
-    # Scaling the modeshapes
-    alpha = oma.modescale(path=path,
-                          Fs=Fs,
-                          n_rov=2,
-                          n_ref=1,
-                          ref_channel=2,
-                          t_meas=t_end,
-                          fPeaks=fPeaks,
-                          Peaks=Peaks,
-                          window=window,
-                          overlap=overlap,
-                          n_seg=n_seg,
-                          zeropadding=zero_padding)
-    if not scaling:
-        alpha = np.ones(alpha.shape)
-    PHI = PHI * alpha
-
-    print(alpha)
-
+    if scaling:
+        # Scaling the mode shapes
+        alpha = oma.modescale(path=path,
+                              Fs=Fs,
+                              n_rov=2,
+                              n_ref=1,
+                              ref_channel=2,
+                              t_meas=t_end,
+                              fPeaks=fPeaks,
+                              window=window,
+                              overlap=overlap,
+                              n_seg=n_seg,
+                              zeropadding=zero_padding)
+        # Normalize PHI
+        PHI = PHI * alpha
+        # for i in range(nPeaks):
+        #     PHI[i, :] = PHI[i, :].real / np.max(np.abs(PHI[i, :].real))
+        #     print(PHI[i, :])
     # Fitting SDOF in frequency domain
     wn = np.zeros((nPeaks, 1))
     zeta = np.zeros((nPeaks, 1))
@@ -135,7 +135,10 @@ if __name__ == '__main__':
     print("Natural Frequencies [Hz]:")
     print(wn / 2 / np.pi)
     print("Damping [%]:")
-    print(zeta*100)
+    print(zeta * 100)
+
+    # additional step in mode shape scaling
+    # PHI = oma.mode_shape_normalize(PHI, [0, 1], 2)
 
     # 2d-Plot modeshapes
     for i in range(nPeaks):
@@ -149,9 +152,9 @@ if __name__ == '__main__':
     E = discretization['E']
 
     for i in range(nPeaks):
-        mode = np.zeros(PHI.shape[1]+4)
-        mode[2:-2] = PHI[i, :].real# -np.mean(PHI[i, :].real)
-        oma.plot_modeshape(N,
-                           E + 1,
-                           mode_shape=mode,
-                           title="Mode " + str(i+1) + " at " + str(round(wn[i, :][0] / 2 / np.pi, 2)) + "Hz")
+        mode = np.zeros(PHI.shape[1] + 4)
+        mode[2:-2] = PHI[i, :].real
+        oma.animate_modeshape(N,
+                              E + 1,
+                              mode_shape=mode,
+                              title="Mode " + str(i + 1) + " at " + str(round(wn[i][0] / 2 / np.pi, 2)) + "Hz")

@@ -79,13 +79,11 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
 
     # find platykurtic frequencies and sort them
     idx_bad = []
-    # kurtosis_mean = kurtosis_mean-np.mean(kurtosis_mean)
-    kurtosis_diff = np.zeros((n_filt-1, 1))
-    # np.diff not working here for whatever reason
-    for i in range(kurtosis_diff.shape[0]):
-        kurtosis_diff[i] = kurtosis_mean[i+1]-kurtosis_mean[i]
-    for i in range(1, kurtosis_diff.shape[0]):
-        if kurtosis_diff[i] <= np.min(kurtosis_diff) / 3:
+    # detrend kurtosis
+    kurtosis_mean =  scipy.signal.detrend(kurtosis_mean, type='linear')
+    kurtosis_mean = kurtosis_mean-np.mean(kurtosis_mean)
+    for i in range(1, kurtosis_mean.shape[0]):
+        if kurtosis_mean[i] <= np.min(kurtosis_mean) / 3:
             idx_bad.append(i)
 
     # Store indices of "harmonic groups" in array

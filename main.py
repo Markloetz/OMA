@@ -1,17 +1,14 @@
 from OMA import OMA_Module as oma
+import numpy as np
+import scipy
 
 if __name__ == "__main__":
-    # Specify Sampling frequency
-    Fs = 2048
-
-    # import data (and plot)
-    acc, Fs = oma.import_data(filename='Data/DataPlateHarmonicInfluence/acc_data_01_09_12_33.csv',
-                              plot=False,
-                              fs=Fs,
-                              time=0.5,
-                              detrend=True,
-                              downsample=False,
-                              cutoff=100)
-
-    H = oma.ssi.block_hankel_matrix(data=acc,
-                                    br=30)
+    # 3d-Plot mode shapes
+    discretization = scipy.io.loadmat('Discretizations/TiflisBruecke.mat')
+    N = discretization['N']
+    E = discretization['E']
+    mode = np.sin(np.pi*np.linspace(0, 1, len(N)))
+    oma.animate_modeshape(N,
+                          E + 1,
+                          mode_shape=mode,
+                          title="Mode Animation Test")
