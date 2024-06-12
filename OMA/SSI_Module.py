@@ -1,5 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import scipy
+import control
 
 
 # This code is a changed version of the code from pyOMA from dagghe (https://github.com/dagghe/PyOMA/tree/master) for
@@ -83,9 +85,11 @@ def ssi_proc(data, fs, ord_min, ord_max, d_ord):
     freqs = []
     zeta = []
     phi = []
+    a_mat = 0
+    c_mat = 0
 
     for i in range(ord_min + d_ord, ord_max + 1, d_ord):
-        state = "     Order " + str(i) + "/" + str((ord_max - ord_min))
+        state = "     Order " + str(i) + "/" + str(ord_max + 1)
         print(state)
         # Cut the results of the svd results according to the current order of the system
         u1 = u[:br * n_ch, :i]
@@ -110,7 +114,7 @@ def ssi_proc(data, fs, ord_min, ord_max, d_ord):
 
     # Return modal parameters
     print("Stochastic Subspace Identification complete...")
-    return freqs, zeta, phi
+    return freqs, zeta, phi, a_mat, c_mat
 
 
 def stabilization_calc(freqs, zeta, modes, limits):
@@ -171,7 +175,7 @@ def stabilization_calc(freqs, zeta, modes, limits):
     return freqs_out, zeta_out, modes_out, order_out
 
 
-def stabilization_diag(freqs, order, cutoff, plot='FDM'):
+def stabilization_diag(freqs, order, cutoff, f, s, plot='FDM'):
     # Plot Stabilization Diagram
     handles = []
     if plot == 'FDM':
@@ -213,6 +217,8 @@ def stabilization_diag(freqs, order, cutoff, plot='FDM'):
                             linestyle='')
         handles = [point0, point1, point2]
 
+    # overlay SVD
+
     plt.xlim([0, cutoff])
     plt.xlabel("f (Hz)")
     plt.ylabel("Model Order")
@@ -222,16 +228,26 @@ def stabilization_diag(freqs, order, cutoff, plot='FDM'):
 
 
 def ssi_extract(ranges, freqs, zeta, modes):
+    freqs_out = []
+    zeta_out = []
+    modes_out = []
+    # iterate over frequency ranges
     for i, _range in enumerate(ranges):
+        f_to_avg = []
+        z_to_avg = []
+        m_to_avg = []
         for j in range(len(freqs)):
-            f_to_avg = []
-            z_to_avg = []
-            m_to_avg = []
             if _range[0] <= freqs[j] <= _range[1]:
                 f_to_avg.append(freqs[j])
                 z_to_avg.append(zeta[j])
                 m_to_avg.append(modes[j])
-            arr = np.array(m_to_avg)
-            print(arr.shape)
-            print('nloop')
-    return 0, 0, 0
+
+        f_avg = np.mean(f_to_avg)
+        z_avg = np.mean(z_to_avg)
+        m_to_avg_arr = np.array(m_to_avg)
+        m_avg = np.mean(m_to_avg_arr, axis=0)
+        freqs_out.append(f_avg)
+        zeta_out.append(z_avg)
+        modes_out.append(m_avg)
+
+    return freqs_out, zeta_out, modes_out

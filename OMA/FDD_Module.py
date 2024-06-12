@@ -242,14 +242,14 @@ def sv_decomp(mat):
 
 def prominence_adjust(x, y, cutoff):
     # Adjusting peak-prominence with slider
-    min_prominence = abs(max(y) / 100)
+    min_prominence = 0
     max_prominence = abs(max(y))
     # Create the plot
     figure, ax = plt.subplots()
     plt.subplots_adjust(bottom=0.25)  # Adjust bottom to make space for the slider
 
     # Plot the initial data
-    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None), distance=np.ceil(len(x) / 1000))
+    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None))
     y_data = y[locs]
     x_data = x[locs]
     line, = ax.plot(x_data, y_data, 'bo')
@@ -267,8 +267,7 @@ def prominence_adjust(x, y, cutoff):
     # Update Plot
     def update(val):
         SliderValClass.slider_val = val
-        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None),
-                                           distance=np.ceil(len(x) / 1000))
+        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None))
         y_data_current = y[locs_]
         x_data_current = x[locs_]
         line.set_xdata(x_data_current)
@@ -292,8 +291,7 @@ def peak_picking(x, y, y2, n_sval=1, cutoff=100):
 
     # get prominence
     locs, _ = scipy.signal.find_peaks(y,
-                                      prominence=(prominence_adjust(x, y, cutoff=cutoff), None),
-                                      distance=np.ceil(len(x) / 1000))
+                                      prominence=(prominence_adjust(x, y, cutoff=cutoff), None))
     y_data = y[locs]
     x_data = x[locs]
     # Peak Picking
@@ -425,7 +423,7 @@ def sdof_half_power(f, y, fn):
     return fn * 2 * np.pi, zeta_est
 
 
-def sdof_time_domain_fit(y, f, fs, n_skip=3, n_peaks=30):
+def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30, plot=False):
     y[np.isnan(y)] = 0
 
     # rearrange arrays
@@ -475,7 +473,7 @@ def sdof_time_domain_fit(y, f, fs, n_skip=3, n_peaks=30):
     # natural frequency estimation
     fn_est = 1 / np.mean(np.diff(t[minmax_fit_idx]) * 2)
     # plot the minima and maxima over the free decay
-    if True:
+    if plot:
         plt.plot(t, sdof_corr, label='Autocorrelation of SDOF bell at '+str(fn_est)+' Hz')
         # plt.plot(t[minmax_fit_idx], minmax_fit)
         plt.grid(visible=True, which='minor')

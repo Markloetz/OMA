@@ -68,7 +68,7 @@ def import_data(filename, plot, fs, time, detrend, downsample, cutoff=1000):
     if plot:
         # Plotting the Data
         for i in range(n_cols):
-            plt.plot(t_vec, data[:, i], label="Modal Point"+str(i+1))
+            plt.plot(t_vec, data[:, i], label="Modal Point" + str(i + 1))
         plt.xlabel('Time')
         plt.ylabel('Acceleration')
         plt.title('Raw Data')
@@ -195,7 +195,7 @@ def animate_modeshape(N, E, mode_shape, title):
 
     # Colormaps, etc...
     # Make the norm
-    norm = colors.Normalize(vmin=-np.max(N[:, 2])*1.5, vmax=np.max(N[:, 2])*1.5, clip=False)
+    norm = colors.Normalize(vmin=-np.max(N[:, 2]) * 1.5, vmax=np.max(N[:, 2]) * 1.5, clip=False)
     # Create symmetric colormap
     myMap = symmetrical_colormap(cm.jet)
     # create a transparent colormap
@@ -254,7 +254,7 @@ def animate_modeshape(N, E, mode_shape, title):
     def update(frame):
         ax.clear()
         for i in range(len(E)):
-            _z = z[i]*np.cos(np.pi/5*frame)
+            _z = z[i] * np.cos(np.pi / 5 * frame)
             # refine mesh for interpolated colormapping
             triang = tri.Triangulation(x[i], y[i])
             refiner = tri.UniformTriRefiner(triang)
@@ -282,7 +282,7 @@ def animate_modeshape(N, E, mode_shape, title):
         set_axes_equal(ax)
 
     # animation
-    _ = animation.FuncAnimation(fig=fig, func=update, interval=50,  frames=20)
+    _ = animation.FuncAnimation(fig=fig, func=update, interval=50, frames=20)
 
     plt.show()
 
@@ -306,7 +306,7 @@ def modescale(path, Fs, n_rov, n_ref, ref_channel, t_meas, fPeaks, window, overl
         # data[:, i * (n_rov + n_ref):(i + 1) * (n_rov + n_ref)]/std_ref
     # calculate and plot spectral densities of reference signals to scale them accordingly
     nPeaks = len(fPeaks)
-    ref_modes = np.zeros((n_files, nPeaks), dtype=np.complex_)
+    ref_modes = np.zeros((n_files, nPeaks, len(ref_channel)), dtype=np.complex_)
     alpha = np.zeros((n_files * n_rov, nPeaks), dtype=np.complex_)
     # loop over each dataset
     for i in range(n_files):
@@ -325,16 +325,19 @@ def modescale(path, Fs, n_rov, n_ref, ref_channel, t_meas, fPeaks, window, overl
         for j in range(nPeaks):
             PHI[j, :] = U[np.where(vf == fPeaks[j]), :]
 
-        # reference mode for each natural frequency
-        ref_modes[i, :] = PHI[:, ref_channel]
+        # reference mode for each natural frequency (dim1 -> number of modal points; dim2 -> number of peaks)
+        ref_modes[i, :, :] = PHI[:, ref_channel]
 
     # calculate scaling factor alpha for each dataset and each peak
     for i in range(n_files):
         for j in range(nPeaks):
             # modal amplitude of dataset i and frequency j
-            amp = ref_modes[i, j]
+            amp = ref_modes[i, j, :].reshape(1, -1)
             # reference amplitude from dataset 0 and frequency j
-            amp_ref = ref_modes[0, j]
+            amp_ref = ref_modes[0, j, :].reshape(1, -1)
+            amp_ref_t = ref_modes[0, j, :].reshape(-1, 1)
+
             # scaling factor
-            alpha[i * n_rov:i * n_rov + n_rov, j] = amp / amp_ref
+            print(amp_ref_t @ amp_ref)
+            alpha[i * n_rov:i * n_rov + n_rov, j] = np.linalg.inv(amp_ref @ amp_ref.T) @ amp
     return np.real(alpha.T)
