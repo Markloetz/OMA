@@ -13,7 +13,7 @@ if __name__ == '__main__':
     t_end = 500
 
     # Threshold for MAC
-    mac_threshold = 0.85
+    mac_threshold = 0.7
 
     # Decide if harmonic filtering is active
     filt = False
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     zero_padding = False
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename="Data/Platte/Data_120624_pos_35_36_01_15.mat",
+    acc, Fs = oma.import_data(filename="Data/Platte_Total.mat",
                               plot=False,
                               fs=Fs,
                               time=t_end,
@@ -143,14 +143,15 @@ if __name__ == '__main__':
     plt.show()
 
     # 3d-Plot mode shapes
-    discretization = scipy.io.loadmat('Discretizations/TiflisBruecke.mat')
+    discretization = scipy.io.loadmat('Discretizations/PlateHoleDiscretization.mat')
     N = discretization['N']
     E = discretization['E']
 
-    # for i in range(nPeaks):
-    #     mode = np.zeros(PHI.shape[1] + 4)
-    #     mode[2:-2] = PHI[i, :].real
-    #     oma.animate_modeshape(N,
-    #                           E + 1,
-    #                           mode_shape=mode,
-    #                           title="Mode " + str(i + 1) + " at " + str(round(wn[i][0] / 2 / np.pi, 2)) + "Hz")
+    for i in range(nPeaks):
+        # mode = np.zeros(PHI.shape[1] + 4)
+        # mode[2:-2] = PHI[i, :].real
+        mode = PHI[i, :].real
+        oma.animate_modeshape(N,
+                              E,        # E+1
+                              mode_shape=mode,
+                              title="Mode " + str(i + 1) + " at " + str(round(wn[i][0] / 2 / np.pi, 2)) + "Hz")

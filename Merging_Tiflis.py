@@ -39,12 +39,13 @@ def exclude_windows(data, threshold, window_length):
 
 
 if __name__ == '__main__':
-    path = "Data/TiflisBruecke/"
+    path = "Data/Platte/"
     Fs = 2048  # [Hz]
     t_meas = 500  # [s]
     n_rov = 2  # number of roving sensors
-    n_ref = 1  # The reference signal is allways at the n_rov+1st column
-    ref_channel = 2
+    n_ref = 2  # The reference signal is allways at the n_rov+1st column
+    ref_channel = [2, 3]
+    ref_pos = [1, 15]
 
     # import data and store in one large array
     # preallocate
@@ -67,8 +68,18 @@ if __name__ == '__main__':
     data_out = np.zeros((data.shape[0], n_rov * n_files))
     j = 0
     for i, col in enumerate(data.T):
-        if (i + 1) % (n_rov + n_ref) != 0:
+        cond = False
+        if n_ref == 2:
+            cond = (i + 1) % (n_rov + n_ref) != 0 and (i + 1) % (n_rov + n_ref) != 3
+        elif n_ref == 1:
+            cond = (i + 1) % (n_rov + n_ref) != 0
+        if cond:
+            # print("out(" + str(j) + ") = data(" + str(i) + ")")
             data_out[:, j] = col
             j = j + 1
 
-    daq.save_to_mat(data_out, "Data/TiflisTotal_2.mat")
+    for i, pos in enumerate(ref_pos):
+        data_out = np.insert(data_out, pos - 1 + i, data[:, ref_channel[i]], axis=1)
+
+    print(data_out.shape)
+    daq.save_to_mat(data_out, "Data/Platte_Total.mat")
