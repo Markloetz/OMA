@@ -10,6 +10,7 @@ if __name__ == '__main__':
     width = 5.75
     n_rows = 8
     n_cols = 2
+    polygon_shape = 4
 
     # create node coordinates
     nodes = np.zeros((n_rows * n_cols, n_cols))

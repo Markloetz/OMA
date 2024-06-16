@@ -523,4 +523,23 @@ def plot_fit(fSDOF, sSDOF, wn, zeta):
 
         # Show the plot
         plt.show()
-        
+
+
+def mode_opt(f, s1, s2, u, f_peak, plot=False):
+    # Calculate ratios between first and second singular values
+    u = u[~np.isnan(u)]
+    s_ratio = s1/s2
+    max_ratio = np.max(s_ratio)
+    u_out = u[np.where(s_ratio == max_ratio)]
+    print(u_out)
+    if plot:
+        # Plot first and second singular values
+        plt.plot(f, 20*np.log10(s1), label="First Singular Value")
+        plt.plot(f, 20 * np.log10(s2), label="Second Singular Value")
+        plt.axvline(x=f_peak, color='black')
+        plt.xlabel("f (Hz)")
+        plt.ylabel("S1/S2 (dB)")
+        plt.title("Singular Value Ratio")
+        plt.legend()
+        plt.show()
+
