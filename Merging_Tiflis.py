@@ -6,12 +6,12 @@ from DAQ_Module import DAQ_Module as daq
 
 
 if __name__ == '__main__':
-    path = "Data/TiflisBruecke/"
+    path = "Data/Platte/"
     Fs = 2048  # [Hz]
     t_meas = 500  # [s]
     n_rov = 2  # number of roving sensors
-    n_ref = 1  # The reference signal is allways at the n_rov+1st column
-    ref_channel = 0
+    n_ref = 2  # The reference signal is allways at the n_rov+1st column
+    ref_channel = [2, 3]
     ref_pos = [0, 0]
 
     # import data and store in one large array
@@ -40,8 +40,8 @@ if __name__ == '__main__':
         else:
             cond = (i + 1) % (n_rov + n_ref) != 0
         if cond:
-            print("out(" + str(j) + ") = data(" + str(i+1) + ")")
-            data_out[:, j] = data[:, i+1]
+            print("out(" + str(j) + ") = data(" + str(i) + ")")
+            data_out[:, j] = data[:, i]
             j = j + 1
 
     # Check if reference sensor(s) need to be merged into the complete dataset
@@ -50,4 +50,4 @@ if __name__ == '__main__':
             data_out = np.insert(data_out, pos - 1 + i, data[:, ref_channel[i]], axis=1)
 
     print(data_out.shape)
-    daq.save_to_mat(data_out, "Data/TiflisTotal.mat")
+    daq.save_to_mat(data_out, "Data/PlatteTotal.mat")

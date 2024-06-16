@@ -414,6 +414,7 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
         for i, pos in enumerate(ref_pos):
             alpha = np.insert(alpha, pos - 1 + i, np.ones(nPeaks), axis=0)
 
+    '''To Add: adapt shape to fit multiple reference setups...'''
     phi_not_scaled = np.zeros((nPeaks, n_rov*n_files), dtype=np.complex_)
     # print(rov_modes)
     for i in range(nPeaks):
