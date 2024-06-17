@@ -33,7 +33,7 @@ if __name__ == '__main__':
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
     # import data (and plot)
-    acc, Fs = oma.import_data(filename="Data/TiflisTotal.mat",
+    acc, Fs = oma.import_data(filename=filename,
                               plot=False,
                               fs=Fs,
                               time=t_end,
@@ -74,7 +74,8 @@ if __name__ == '__main__':
                                       overlap=overlap,
                                       n_seg=n_seg,
                                       zeropadding=zero_padding,
-                                      mac_threshold=mac_threshold)
+                                      mac_threshold=mac_threshold,
+                                      plot=True)
 
     # Print Damping and natural frequencies
     print("Natural Frequencies [Hz]:")
@@ -90,6 +91,8 @@ if __name__ == '__main__':
         plt.plot(np.real(PHI[i, :]), label="Mode: " + str(i + 1))
     plt.legend()
     plt.show()
+
+    '''Standardabweichung für die Dämpfung angeben'''
 
     # 3d-Plot mode shapes
     discretization = scipy.io.loadmat('Discretizations/TiflisBruecke.mat')

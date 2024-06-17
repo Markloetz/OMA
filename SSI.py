@@ -13,18 +13,18 @@ if __name__ == '__main__':
     # Specify limits
     f_lim = 0.05  # Pole stability (frequency)
     z_lim = 0.05  # Pole stability (damping)
-    mac_lim = 0.25  # Mode stability (MAC-Value)
+    mac_lim = 0.3  # Mode stability (MAC-Value)
     z_max = 0.05  # Maximum damping value
     limits = [f_lim, z_lim, mac_lim, z_max]
 
     # block-rows
-    br = 4
+    br = 6
     ord_max = br * 12
     ord_min = 0
-    d_ord = 1
+    d_ord = 2
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename='Data/TiflisTotal_2.mat',
+    acc, Fs = oma.import_data(filename='Data/TiflisTotal.mat',
                               plot=False,
                               fs=Fs,
                               time=500,
@@ -45,7 +45,7 @@ if __name__ == '__main__':
     freqs_stable, zeta_stable, modes_stable, order_stable = oma.ssi.stabilization_calc(freqs, zeta, modes, limits)
 
     # Plot Stabilization Diagram
-    oma.ssi.stabilization_diag(freqs_stable, order_stable, cutoff)
+    oma.ssi.stabilization_diag(freqs_stable, order_stable, cutoff, plot='FDM')
 
     # Extract modal parameters at relevant frequencies
     f_rel = [[12.5, 13.5], [17.5, 18.5]]

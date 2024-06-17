@@ -175,7 +175,7 @@ def stabilization_calc(freqs, zeta, modes, limits):
     return freqs_out, zeta_out, modes_out, order_out
 
 
-def stabilization_diag(freqs, order, cutoff, f, s, plot='FDM'):
+def stabilization_diag(freqs, order, cutoff, plot='FDM'):
     # Plot Stabilization Diagram
     handles = []
     if plot == 'FDM':

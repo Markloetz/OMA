@@ -4,7 +4,6 @@ import glob
 import os
 from DAQ_Module import DAQ_Module as daq
 
-
 if __name__ == '__main__':
     path = "Data/Platte/"
     Fs = 2048  # [Hz]
@@ -12,7 +11,7 @@ if __name__ == '__main__':
     n_rov = 2  # number of roving sensors
     n_ref = 2  # The reference signal is allways at the n_rov+1st column
     ref_channel = [2, 3]
-    ref_pos = [0, 0]
+    ref_pos = [1, 15]
 
     # import data and store in one large array
     # preallocate
@@ -26,8 +25,6 @@ if __name__ == '__main__':
                                        detrend=True,
                                        downsample=False,
                                        cutoff=Fs // 2)
-        # for j in range(data_temp.shape[1]):
-        #     data_temp[:, j] = exclude_windows(data_temp[:, j], data_temp[:, j].std()*3, Fs*2)
         data[:, i * (n_rov + n_ref):(i + 1) * (n_rov + n_ref)] = data_temp
 
     # Fill the merged data array
@@ -47,7 +44,8 @@ if __name__ == '__main__':
     # Check if reference sensor(s) need to be merged into the complete dataset
     if np.mean(ref_pos) > 0:
         for i, pos in enumerate(ref_pos):
-            data_out = np.insert(data_out, pos - 1 + i, data[:, ref_channel[i]], axis=1)
+            print("out(" + str(pos - 1) + ") = data(" + str(ref_channel[i]) + ")")
+            data_out = np.insert(data_out, pos - 1, data[:, ref_channel[i]], axis=1)
 
-    print(data_out.shape)
     daq.save_to_mat(data_out, "Data/PlatteTotal.mat")
+

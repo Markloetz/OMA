@@ -14,13 +14,13 @@ if __name__ == '__main__':
     filename = "Data/PlatteTotal.mat"
 
     # Cutoff frequency (band of interest)
-    cutoff = 35
+    cutoff = 100
 
     # measurement duration
     t_end = 500
 
     # Threshold for MAC
-    mac_threshold = 0.85
+    mac_threshold = 0.95
 
     # Decide if harmonic filtering is active
     filt = False
@@ -61,7 +61,8 @@ if __name__ == '__main__':
     fPeaks, Peaks, nPeaks = oma.fdd.peak_picking(vf, 20 * np.log10(S), 20 * np.log10(S2), n_sval=1, cutoff=cutoff)
 
     '''Extract modal damping by averaging over the damping values of each dataset'''
-    # Scaling the mode shapes
+    '''Average the fitted frequencies'''
+    '''Merge and Scale the Mode Shapes'''
     wn, zeta, PHI = oma.modal_extract(path=path,
                                       Fs=Fs,
                                       n_rov=2,
@@ -74,16 +75,14 @@ if __name__ == '__main__':
                                       overlap=overlap,
                                       n_seg=n_seg,
                                       zeropadding=zero_padding,
-                                      mac_threshold=mac_threshold)
+                                      mac_threshold=mac_threshold,
+                                      plot=False)
 
     # Print Damping and natural frequencies
     print("Natural Frequencies [Hz]:")
     print(wn / 2 / np.pi)
     print("Damping [%]:")
     print(zeta * 100)
-
-    # additional step in mode shape scaling
-    # PHI = oma.mode_shape_normalize(PHI, [0, 1], 2)
 
     # 2d-Plot modeshapes
     for i in range(nPeaks):

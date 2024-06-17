@@ -288,28 +288,27 @@ def animate_modeshape(N, E, mode_shape, title):
 
 
 def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, window, overlap, n_seg, zeropadding,
-                  mac_threshold=0.85):
-    # import data and store in one large array
+                  mac_threshold=0.85, plot=False):
+    # variables
     nPeaks = len(fPeaks)
     n_files = len([name for name in os.listdir(path)])
-    data = np.zeros((int(t_meas * Fs), n_files * (n_rov + n_ref)))
-    for i, filename in enumerate(glob.glob(os.path.join(path, '*.mat'))):
-        data[:, i * (n_rov + n_ref):(i + 1) * (n_rov + n_ref)], _ = import_data(filename=filename,
-                                                                                plot=False,
-                                                                                fs=Fs,
-                                                                                time=t_meas,
-                                                                                detrend=False,
-                                                                                downsample=False,
-                                                                                cutoff=Fs // 2)
-
-    # Preallocate storage for natural frequencies, damping and the reference mode
+    # Preallocate arrays natural frequencies, damping and the reference/roving modes
     wn = np.zeros((n_files, nPeaks))
     zeta = np.zeros((n_files, nPeaks))
     ref_modes = np.zeros((n_files, nPeaks, n_ref), dtype=np.complex_)
     rov_modes = np.zeros((n_files, nPeaks, n_rov), dtype=np.complex_)
-    # Do EFDD procedure for each dataset
-    for i in range(n_files):
-        mCPSD, vf = fdd.cpsd_matrix(data=data[:, i * (n_rov + n_ref):(i + 1) * (n_rov + n_ref)],
+
+    # Import Data and do EFDD procedure for each dataset
+    for i, filename in enumerate(glob.glob(os.path.join(path, '*.mat'))):
+        data, _ = import_data(filename=filename,
+                              plot=False,
+                              fs=Fs,
+                              time=t_meas,
+                              detrend=False,
+                              downsample=False,
+                              cutoff=Fs // 2)
+
+        mCPSD, vf = fdd.cpsd_matrix(data=data,
                                     fs=Fs,
                                     zero_padding=zeropadding,
                                     n_seg=n_seg,
@@ -341,7 +340,7 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
         fSDOF = np.full((nMAC, nPeaks), np.nan)
         sSDOF = np.full((nMAC, nPeaks), np.nan)
         sSDOF_2 = np.full((nMAC, nPeaks), np.nan)
-        uSDOF = np.full((nMAC, nPeaks, n_rov+n_ref), np.nan, dtype=np.complex_)
+        uSDOF = np.full((nMAC, nPeaks, n_rov + n_ref), np.nan, dtype=np.complex_)
         for j in range(nPeaks):
             indSDOF = fdd.find_widest_range(array=mac_vec[:, j].real,
                                             center_indices=np.where(vf == fPeaks[j])[0])
@@ -350,30 +349,30 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
             sSDOF_2[indSDOF, j] = S2[indSDOF, 0]
             uSDOF[indSDOF, j] = U[indSDOF, :]
 
-        print(uSDOF[:, 0][~np.isnan(uSDOF[:, 0])])
         for j in range(nPeaks):
-            fdd.mode_opt(fSDOF[:, j], sSDOF[:, j], sSDOF_2[:, j], uSDOF[:, j, :], fPeaks[j])
+            # fdd.mode_opt(fSDOF[:, j], sSDOF[:, j], sSDOF_2[:, j], uSDOF[:, j, :], fPeaks[j])
             # reference mode for each natural frequency (dim1 -> number of modal points; dim2 -> number of peaks)
             ref_modes[i, j] = PHI[j, ref_channel]
             # modes from the roving sensors (al modal displacements except the reference ones)
             rov_modes[i, j] = np.delete(PHI[j, :], ref_channel, axis=0)
-            # print("Ref: " + str(ref_modes[i, j]))
-            # print("Rov: " + str(rov_modes[i, j]))
+            print("Ref: " + str(ref_modes[i, j]))
+            print("Rov: " + str(rov_modes[i, j]))
 
         # Plotting the singular values
-        for j in range(nPeaks):
-            fSDOF_temp = fSDOF[:, j][~np.isnan(fSDOF[:, j])]
-            sSDOF_temp_1 = sSDOF[:, j][~np.isnan(sSDOF[:, j])]
-            sSDOF_temp_2 = sSDOF_2[:, j][~np.isnan(sSDOF_2[:, j])]
-            color = ((nPeaks - j) / nPeaks, (j + 1) / nPeaks, (nPeaks - j) / nPeaks, 1)
-            plt.plot(fSDOF_temp, 20 * np.log10(sSDOF_temp_1), color=color)
-            plt.plot(fSDOF_temp, 20 * np.log10(sSDOF_temp_2), color=color)
-            plt.axvline(x=fPeaks[j], color='red', label="f = "+str(round(fPeaks[j])) + " Hz")
-        plt.xlabel('Frequency (Hz)')
-        plt.ylabel('Singular Values (dB)')
-        plt.title('Singular Values of SDOF Equivalents')
-        plt.grid(True)
-        plt.show()
+        if plot:
+            for j in range(nPeaks):
+                fSDOF_temp = fSDOF[:, j][~np.isnan(fSDOF[:, j])]
+                sSDOF_temp_1 = sSDOF[:, j][~np.isnan(sSDOF[:, j])]
+                sSDOF_temp_2 = sSDOF_2[:, j][~np.isnan(sSDOF_2[:, j])]
+                color = ((nPeaks - j) / nPeaks, (j + 1) / nPeaks, (nPeaks - j) / nPeaks, 1)
+                plt.plot(fSDOF_temp, 20 * np.log10(sSDOF_temp_1), color=color)
+                plt.plot(fSDOF_temp, 20 * np.log10(sSDOF_temp_2), color=color)
+                plt.axvline(x=fPeaks[j], color='red', label="f = " + str(round(fPeaks[j])) + " Hz")
+            plt.xlabel('Frequency (Hz)')
+            plt.ylabel('Singular Values (dB)')
+            plt.title('Singular Values of SDOF Equivalents')
+            plt.grid(True)
+            plt.show()
 
         # Get the Damping Value by fitting the SDOFs in frequency domain
         for j in range(nPeaks):
@@ -386,11 +385,6 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
     # Average damping and scaling over all datasets
     wn_out = np.mean(wn, axis=0)
     zeta_out = np.mean(zeta, axis=0)
-
-    # merge reference of first dateset modes and roving modes
-    if np.sum(ref_pos) != 0:
-        for i, pos in enumerate(ref_pos):
-            rov_modes = np.insert(rov_modes, pos - 1 + i, ref_modes[i, :, :], axis=0)
 
     # Scale the mode shapes according to  the modal displacement of the reference coordinate
     alpha = np.zeros((n_files * n_rov, nPeaks), dtype=np.complex_)
@@ -410,16 +404,20 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
                 amp_ref = ref_modes[0, j]
                 # scaling factor
                 alpha[i * n_rov:i * n_rov + n_rov, j] = (amp / amp_ref)
-    if np.sum(ref_pos) != 0:
-        phi_not_scaled = np.zeros((nPeaks, n_rov * n_files+n_rov), dtype=np.complex_)
-        for i, pos in enumerate(ref_pos):
-            alpha = np.insert(alpha, pos - 1 + i, np.ones(nPeaks), axis=0)
-    else:
-        phi_not_scaled = np.zeros((nPeaks, n_rov * n_files), dtype=np.complex_)
 
+    # Preallocate modeshape matrix
+    phi_not_scaled = np.zeros((nPeaks, n_rov * n_files), dtype=np.complex_)
+
+    # Rearrange roving modes in the order of measurement
     for i in range(nPeaks):
         phi_not_scaled[i, :] = rov_modes[:, i, :].flatten()
-        # print("Modeshape at peak "+str(i))
 
-    phi_out = phi_not_scaled*alpha.T
+    if np.sum(ref_pos) > 0:
+        for j, pos in enumerate(ref_pos):
+            # add reference modes to the not yet scaled roving modes
+            phi_not_scaled = np.insert(phi_not_scaled, pos - 1, ref_modes[0, :, j], axis=1)
+            # add scaling factor of 1 (none) at the positions of the reference sensors
+            alpha = np.insert(alpha, pos - 1, np.ones(nPeaks), axis=0)
+
+    phi_out = phi_not_scaled # * alpha.T
     return wn_out, zeta_out, phi_out
