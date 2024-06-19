@@ -2,6 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy
 from OMA import OMA_Module as oma
+import time
 
 if __name__ == '__main__':
 
@@ -107,4 +108,8 @@ if __name__ == '__main__':
         oma.animate_modeshape(N,
                               E + 1,
                               mode_shape=mode,
-                              title=title)
+                              f_n=wn[i] / 2 / np.pi,
+                              zeta_n=zeta[i],
+                              directory="Animations/Tiflis_1/",
+                              mode_nr=i+1,
+                              plot=True)

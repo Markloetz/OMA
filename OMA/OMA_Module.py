@@ -144,149 +144,6 @@ def mps(data, fs):
     plt.show()
 
 
-def animate_modeshape(N, E, mode_shape, title):
-    # Functions
-    # create a custom symmetrical colormap
-    def symmetrical_colormap(cmap):
-        # this defined the roughness of the colormap, 128 fine
-        n = 128
-
-        # get the list of color from colormap
-        colors_r = cmap(np.linspace(0, 1, n))  # take the standard colormap # 'right-part'
-        colors_l = colors_r[::-1]  # take the first list of color and flip the order # "left-part"
-
-        # combine them and build a new colormap
-        colors_ = np.vstack((colors_l, colors_r))
-        my_map = colors.LinearSegmentedColormap.from_list('symmetric_jet', colors_)
-        return my_map
-
-    # function to set axis of 3d plot equal
-    def set_axes_equal(ax):
-        x_limits = ax.get_xlim3d()
-        y_limits = ax.get_ylim3d()
-        z_limits = ax.get_zlim3d()
-
-        x_range = abs(x_limits[1] - x_limits[0])
-        x_middle = np.mean(x_limits)
-        y_range = abs(y_limits[1] - y_limits[0])
-        y_middle = np.mean(y_limits)
-        z_range = abs(z_limits[1] - z_limits[0])
-        z_middle = np.mean(z_limits)
-
-        # The plot bounding box is a sphere in the sense of the infinity
-        # norm, hence I call half the max range the plot radius.
-        plot_radius = 0.5 * max([x_range, y_range, z_range])
-
-        ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
-        ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
-        ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
-
-    # Pre-Animation Calculations (Initial Data)
-    # scale mode shapes according to the size of the object
-    x_diff = np.max(N[:, 0]) - np.min(N[:, 0])
-    y_diff = np.max(N[:, 1]) - np.min(N[:, 1])
-    longest_dim = np.max([x_diff, y_diff])
-    mode_shape = mode_shape / np.max(np.abs(mode_shape)) * (longest_dim / 15)
-    # Write the mode shape (z-coordinates) into the node vector
-    N_temp = np.zeros((N.shape[0], N.shape[1] + 1))
-    N_temp[:, 2] = mode_shape
-    N_temp[:, :2] = N
-    N = N_temp
-
-    # Colormaps, etc...
-    # Make the norm
-    norm = colors.Normalize(vmin=-np.max(np.abs(N[:, 2])) * 1.5, vmax=np.max(np.abs(N[:, 2])) * 1.5, clip=False)
-    # Create symmetric colormap
-    myMap = symmetrical_colormap(cm.jet)
-    # create a transparent colormap
-    # Define discrete colors with alpha
-    color = [
-        (1.0, 0.0, 0.0, 0.0),  # Fully transparent red
-        (0.0, 1.0, 0.0, 0.0),  # Semi-transparent green
-        (0.0, 0.0, 1.0, 0.0)  # Fully opaque blue
-    ]
-    cm_transparent = colors.ListedColormap(color)
-
-    # Create a 3D plot
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    # Title
-    ax.set_title(title)
-
-    # Initial Plot for each element face with interpolated color based on displacement
-    x = []
-    y = []
-    z = []
-    for e, element in enumerate(E):
-        # Get the coordinates of the nodes for this element
-        nodes = np.zeros((3, 3))
-        for i, node_idx in enumerate(element):
-            nodes[i, :] = N[node_idx - 1, :]
-        # Extract x, y, z coordinates of the nodes
-        x.append(nodes[:, 0])
-        y.append(nodes[:, 1])
-        z.append(nodes[:, 2])
-
-        # refine mesh for interpolated colormapping
-        triang = tri.Triangulation(x[e], y[e])
-        refiner = tri.UniformTriRefiner(triang)
-        interpolator = tri.LinearTriInterpolator(triang, z[e])
-        new, new_z = refiner.refine_field(z, interpolator, subdiv=3)
-
-        # Plot the polygon
-        ax.plot_trisurf(new.x, new.y, new_z, cmap=myMap, norm=norm, alpha=1, linewidth=0)
-        ax.plot_trisurf(x[e], y[e], z[e], triangles=[[0, 1, 2]], cmap=cm_transparent, linewidth=1, edgecolor='black')
-
-    # Set plot limits
-    ax.set_xlim(np.min(N[:, 0]), np.max(N[:, 0]))
-    ax.set_ylim(np.min(N[:, 1]), np.max(N[:, 1]))
-    ax.set_zlim(np.min(N[:, 2]), np.max(N[:, 2]))
-
-    # Set labels
-    ax.set_xlabel('X')
-    ax.set_ylabel('Y')
-    ax.set_zlabel('Z')
-
-    # Set axis equal
-    set_axes_equal(ax)
-
-    # Update frame of animation
-    def update(frame):
-        ax.clear()
-        for i in range(len(E)):
-            _z = z[i] * np.cos(np.pi / 5 * frame)
-            # refine mesh for interpolated colormapping
-            triang = tri.Triangulation(x[i], y[i])
-            refiner = tri.UniformTriRefiner(triang)
-            interpolator = tri.LinearTriInterpolator(triang, _z)
-            new, new_z = refiner.refine_field(z, interpolator, subdiv=2)
-
-            # Plot the polygon
-            ax.plot_trisurf(new.x, new.y, new_z, cmap=myMap, norm=norm, alpha=1, linewidth=0)
-            ax.plot_trisurf(x[i], y[i], _z, triangles=[[0, 1, 2]], cmap=cm_transparent, linewidth=1,
-                            edgecolor='black')
-        # Set plot limits
-        ax.set_xlim(np.min(N[:, 0]), np.max(N[:, 0]))
-        ax.set_ylim(np.min(N[:, 1]), np.max(N[:, 1]))
-        ax.set_zlim(np.min(N[:, 2]), np.max(N[:, 2]))
-
-        # Set labels
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-
-        # Title
-        ax.set_title(title)
-
-        # Set axis equal
-        set_axes_equal(ax)
-
-    # animation
-    _ = animation.FuncAnimation(fig=fig, func=update, interval=50, frames=20)
-
-    plt.show()
-
-
 def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, window, overlap, n_seg, zeropadding,
                   mac_threshold=0.85, plot=False):
     # variables
@@ -355,8 +212,8 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
             ref_modes[i, j] = PHI[j, ref_channel]
             # modes from the roving sensors (al modal displacements except the reference ones)
             rov_modes[i, j] = np.delete(PHI[j, :], ref_channel, axis=0)
-            print("Ref: " + str(ref_modes[i, j]))
-            print("Rov: " + str(rov_modes[i, j]))
+            # print("Ref: " + str(ref_modes[i, j]))
+            # print("Rov: " + str(rov_modes[i, j]))
 
         # Plotting the singular values
         if plot:
@@ -392,11 +249,14 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
         for j in range(nPeaks):
             if n_ref > 1:
                 # modal amplitude of dataset i and frequency j
-                amp = ref_modes[i, j, :].reshape(1, -1)
+                amp = ref_modes[i, j, :].reshape(n_ref, -1)
+                amp_t = ref_modes[i, j, :].reshape(1, n_ref)
                 # reference amplitude from dataset 0 and frequency j
-                amp_ref = ref_modes[0, j, :].reshape(1, -1)
-                amp_ref_t = ref_modes[0, j, :].reshape(-1, 1)
-                alpha[i * n_rov:i * n_rov + n_rov, j] = np.linalg.inv(amp_ref @ amp_ref_t) @ amp
+                amp_ref = ref_modes[0, j, :].reshape(n_ref, -1)
+                amp_ref_t = ref_modes[0, j, :].reshape(1, n_ref)
+                # alpha[i * n_rov:i * n_rov + n_rov, j] = amp[:, 0]/amp_ref[:, 0]
+                alpha_ij = 1 / (amp_ref_t @ amp_ref) * amp_t @ amp
+                alpha[i * n_rov:i * n_rov + n_rov, j] = alpha_ij
             else:
                 # modal amplitude of dataset i and frequency j
                 amp = ref_modes[i, j]
@@ -419,5 +279,102 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
             # add scaling factor of 1 (none) at the positions of the reference sensors
             alpha = np.insert(alpha, pos - 1, np.ones(nPeaks), axis=0)
 
-    phi_out = phi_not_scaled # * alpha.T
+    phi_out = phi_not_scaled * alpha.T
     return wn_out, zeta_out, phi_out
+
+
+def save_and_start(filename, animation):
+    print("Saving Animation...")
+    animation.save(filename, writer='pillow')
+    print(f"Animation stored to {filename}!")
+
+
+def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=True):
+
+    # Create a custom symmetrical colormap
+    def symmetrical_colormap(cmap):
+        n = 128
+        colors_r = cmap(np.linspace(0, 1, n))
+        colors_l = colors_r[::-1]
+        colors_ = np.vstack((colors_l, colors_r))
+        my_map = colors.LinearSegmentedColormap.from_list('symmetric_jet', colors_)
+        return my_map
+
+    # Function to set axis of 3d plot equal
+    def set_axes_equal(ax):
+        x_limits = ax.get_xlim3d()
+        y_limits = ax.get_ylim3d()
+        z_limits = ax.get_zlim3d()
+
+        x_range = abs(x_limits[1] - x_limits[0])
+        x_middle = np.mean(x_limits)
+        y_range = abs(y_limits[1] - y_limits[0])
+        y_middle = np.mean(y_limits)
+        z_range = abs(z_limits[1] - z_limits[0])
+        z_middle = np.mean(z_limits)
+
+        plot_radius = 0.5 * max([x_range, y_range, z_range])
+
+        ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
+        ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
+        ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
+
+    # Pre-Animation Calculations (Initial Data)
+    x_diff = np.max(N[:, 0]) - np.min(N[:, 0])
+    y_diff = np.max(N[:, 1]) - np.min(N[:, 1])
+    longest_dim = np.max([x_diff, y_diff])
+    mode_shape = mode_shape / np.max(np.abs(mode_shape)) * (longest_dim / 15)
+
+    N_temp = np.zeros((N.shape[0], N.shape[1] + 1))
+    N_temp[:, 2] = mode_shape
+    N_temp[:, :2] = N
+    N = N_temp
+
+    norm = colors.Normalize(vmin=-np.max(np.abs(N[:, 2])) * 1.3, vmax=np.max(np.abs(N[:, 2])) * 1.3, clip=False)
+    myMap = symmetrical_colormap(cm.jet)
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz ({round(zeta_n * 100, 2)}%)"
+    ax.set_title(title)
+
+    x = []
+    y = []
+    z = []
+    for e, element in enumerate(E):
+        nodes = np.zeros((3, 3))
+        for i, node_idx in enumerate(element):
+            nodes[i, :] = N[node_idx - 1, :]
+        x.append(nodes[:, 0])
+        y.append(nodes[:, 1])
+        z.append(nodes[:, 2])
+
+    def update(frame):
+        ax.clear()
+        ax.set_xlim(np.min(N[:, 0]), np.max(N[:, 0]))
+        ax.set_ylim(np.min(N[:, 1]), np.max(N[:, 1]))
+        ax.set_zlim(np.min(N[:, 2]), np.max(N[:, 2]))
+        ax.set_xlabel('X')
+        ax.set_ylabel('Y')
+        ax.set_zlabel('Z')
+        ax.set_title(title)
+        set_axes_equal(ax)
+        for i in range(len(E)):
+            _z = z[i] * np.cos(np.pi / 5 * frame)
+            triang = tri.Triangulation(x[i], y[i])
+            refiner = tri.UniformTriRefiner(triang)
+            interpolator = tri.LinearTriInterpolator(triang, _z)
+            new, new_z = refiner.refine_field(z, interpolator, subdiv=3)
+
+            ax.plot_trisurf(new.x, new.y, new_z, cmap=myMap, norm=norm, alpha=1, linewidth=0)
+            ax.plot_trisurf(x[i], y[i], _z, triangles=[[0, 1, 2]],
+                            cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
+                            edgecolor='black')
+
+    ani = animation.FuncAnimation(fig=fig, func=update, frames=20)
+    filename = f"{directory}mode_{mode_nr}_{round(f_n)}Hz.gif"
+    print("Saving Animation...")
+    ani.save(filename, writer='pillow', fps=50)
+    with open(filename, 'rb') as f:
+        f.flush()
+    print(f"Animation saved to {filename}!")

@@ -14,7 +14,7 @@ if __name__ == '__main__':
     filename = "Data/PlatteTotal.mat"
 
     # Cutoff frequency (band of interest)
-    cutoff = 100
+    cutoff = 200
 
     # measurement duration
     t_end = 500
@@ -97,9 +97,11 @@ if __name__ == '__main__':
 
     for i in range(nPeaks):
         mode = PHI[i, :].real
-        title = "Mode " + str(i + 1) + " at " + str(round(wn[i] / 2 / np.pi, 2)) + "Hz (" + str(
-            round(zeta[i] * 100, 2)) + "%)"
         oma.animate_modeshape(N,
                               E,
                               mode_shape=mode,
-                              title=title)
+                              f_n=wn[i] / 2 / np.pi,
+                              zeta_n=zeta[i],
+                              directory="Animations/Plate/",
+                              mode_nr=i+1,
+                              plot=True)
