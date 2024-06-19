@@ -80,6 +80,48 @@ def import_data(filename, plot, fs, time, detrend, downsample, cutoff=1000):
     return data, fs_new
 
 
+def merge_data(path, fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, detrend, cutoff, downsample):
+    # import data and store in one large array
+    # preallocate
+    n_files = len([name for name in os.listdir(path)])
+    data = np.zeros((int(t_meas * fs), n_files * (n_rov + n_ref)))
+    for i, filename in enumerate(glob.glob(os.path.join(path, '*.mat'))):
+        data_temp, fs = import_data(filename=filename,
+                                    plot=False,
+                                    fs=fs,
+                                    time=t_meas,
+                                    detrend=detrend,
+                                    downsample=downsample,
+                                    cutoff=cutoff)
+        data[:, i * (n_rov + n_ref):(i + 1) * (n_rov + n_ref)] = data_temp
+
+    # Fill the merged data array
+    # preallocate
+    data_out = np.zeros((data.shape[0], n_rov * n_files))
+    j = 0
+    for i, _ in enumerate(data.T):
+        if n_ref == 2:
+            cond = (i + 1) % (n_rov + n_ref) != 0 and (i + 1) % (n_rov + n_ref) != 3
+            if cond:
+                print("out(" + str(j) + ") = data(" + str(i) + ")")
+                data_out[:, j] = data[:, i]
+                j = j + 1
+        else:
+            cond = (i + 1) % (n_rov + n_ref) != 0
+            if cond:
+                print("out(" + str(j) + ") = data(" + str(i + 1) + ")")
+                data_out[:, j] = data[:, i + 1]
+                j = j + 1
+
+    # Check if reference sensor(s) need to be merged into the complete dataset
+    if np.mean(ref_pos) > 0:
+        for i, pos in enumerate(ref_pos):
+            print("out(" + str(pos - 1) + ") = data(" + str(ref_channel[i]) + ")")
+            data_out = np.insert(data_out, pos - 1, data[:, ref_channel[i]], axis=1)
+
+    return data_out, fs
+
+
 # MergedPowerSpectrum
 def mps(data, fs):
     # dimensions
@@ -247,7 +289,7 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
     ref_idx = []
     if n_ref > 1:
         for i in range(nPeaks):
-            if np.sum(np.abs(ref_modes[0, j, :])) > np.sum(np.abs(ref_modes[1, j, :])):
+            if np.sum(np.abs(ref_modes[:, i, 0])) > np.sum(np.abs(ref_modes[:, i, 1].real)):
                 ref_idx.append(0)
             else:
                 ref_idx.append(1)
@@ -259,11 +301,11 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
             if n_ref > 1:
                 # modal amplitude of dataset i and frequency j
                 amp = ref_modes[i, j, :].reshape(n_ref, -1)
-                amp_t = ref_modes[i, j, :].reshape(1, n_ref)
+                # amp_t = ref_modes[i, j, :].reshape(1, n_ref)
                 # reference amplitude from dataset 0 and frequency j
                 amp_ref = ref_modes[0, j, :].reshape(n_ref, -1)
-                amp_ref_t = ref_modes[0, j, :].reshape(1, n_ref)
-                alpha[i * n_rov:i * n_rov + n_rov, j] = amp[:, ref_idx[j]]/amp_ref[:, ref_idx[j]]
+                # amp_ref_t = ref_modes[0, j, :].reshape(1, n_ref)
+                alpha[i * n_rov:i * n_rov + n_rov, j] = amp[ref_idx[j], :] / amp_ref[ref_idx[j], :]
                 # alpha_ij = min(1 / (amp_ref_t @ amp_ref) * amp)
                 # alpha[i * n_rov:i * n_rov + n_rov, j] = alpha_ij
             else:
@@ -412,11 +454,16 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
                             cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
                             edgecolor='black')]
 
-    ani = animation.FuncAnimation(fig=fig, func=update, fargs=(art0, art1), frames=n_frames, interval=20,
+    ani = animation.FuncAnimation(fig=fig, func=update, fargs=(art0, art1), frames=n_frames, interval=100,
                                   blit=False)
     if plot:
         plt.show()
-    filename = f"{directory}mode_{mode_nr}_{round(f_n)}Hz.gif"
+
+    # create directory if it doesn't exist:
+    filename = f"{directory}mode_{round(f_n)}Hz.gif"
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+    # save the animation
     print("Saving Animation...")
-    ani.save(filename, writer='pillow', fps=50)
+    ani.save(filename, writer='pillow')
     print(f"Animation saved to {filename}!")

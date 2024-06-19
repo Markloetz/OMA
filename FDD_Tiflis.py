@@ -2,7 +2,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import scipy
 from OMA import OMA_Module as oma
-import time
 
 if __name__ == '__main__':
 
@@ -10,18 +9,21 @@ if __name__ == '__main__':
     # Specify Sampling frequency
     Fs = 2048
 
-    # Filename and Path
+    # Path of Measurement Files and other specifications
     path = "Data/TiflisBruecke/"
-    filename = "Data/TiflisTotal.mat"
+    n_rov = 2
+    n_ref = 1
+    ref_channel = 0
+    ref_position = [0, 0]
 
     # Cutoff frequency (band of interest)
-    cutoff = 35
+    cutoff = 40
 
     # measurement duration
     t_end = 500
 
     # Threshold for MAC
-    mac_threshold = 0.85
+    mac_threshold = 0.9
 
     # Decide if harmonic filtering is active
     filt = False
@@ -33,14 +35,17 @@ if __name__ == '__main__':
     zero_padding = False
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
-    # import data (and plot)
-    acc, Fs = oma.import_data(filename=filename,
-                              plot=False,
-                              fs=Fs,
-                              time=t_end,
-                              detrend=True,
-                              downsample=False,
-                              cutoff=cutoff)
+    # import data
+    acc, Fs = oma.merge_data(path=path,
+                             fs=Fs,
+                             n_rov=n_rov,
+                             n_ref=n_ref,
+                             ref_channel=ref_channel,
+                             ref_pos=ref_position,
+                             t_meas=t_end,
+                             detrend=True,
+                             cutoff=cutoff,
+                             downsample=False)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc,
@@ -65,10 +70,10 @@ if __name__ == '__main__':
     # Scaling the mode shapes
     wn, zeta, PHI = oma.modal_extract(path=path,
                                       Fs=Fs,
-                                      n_rov=2,
-                                      n_ref=1,
-                                      ref_channel=0,
-                                      ref_pos=0,
+                                      n_rov=n_rov,
+                                      n_ref=n_ref,
+                                      ref_channel=ref_channel,
+                                      ref_pos=ref_position,
                                       t_meas=t_end,
                                       fPeaks=fPeaks,
                                       window=window,

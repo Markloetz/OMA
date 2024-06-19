@@ -138,7 +138,7 @@ def daq_oma(device_in, channels, duration, fs, acc_sensitivities):
             time.sleep(1)
             t_cur = time.time()
             t_elapsed = t_cur-t_start
-            print(int(t_elapsed))#, end='\r')
+            print(int(t_elapsed), end='\r')
         acc_data = acc_task.read(number_of_samples_per_channel=(duration + 4) * fs, timeout=duration + 4)
 
         # Stop everything
