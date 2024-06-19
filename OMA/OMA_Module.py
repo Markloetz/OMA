@@ -207,7 +207,7 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
             uSDOF[indSDOF, j] = U[indSDOF, :]
 
         for j in range(nPeaks):
-            # fdd.mode_opt(fSDOF[:, j], sSDOF[:, j], sSDOF_2[:, j], uSDOF[:, j, :], fPeaks[j])
+            # PHI[j, :] = fdd.mode_opt(fSDOF[:, j], sSDOF[:, j], sSDOF_2[:, j], uSDOF[:, j, :], fPeaks[j], plot=True)
             # reference mode for each natural frequency (dim1 -> number of modal points; dim2 -> number of peaks)
             ref_modes[i, j] = PHI[j, ref_channel]
             # modes from the roving sensors (al modal displacements except the reference ones)
@@ -243,6 +243,15 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
     wn_out = np.mean(wn, axis=0)
     zeta_out = np.mean(zeta, axis=0)
 
+    # decide which one of the reference sensors is used for the scaling
+    ref_idx = []
+    if n_ref > 1:
+        for i in range(nPeaks):
+            if np.sum(np.abs(ref_modes[0, j, :])) > np.sum(np.abs(ref_modes[1, j, :])):
+                ref_idx.append(0)
+            else:
+                ref_idx.append(1)
+
     # Scale the mode shapes according to  the modal displacement of the reference coordinate
     alpha = np.zeros((n_files * n_rov, nPeaks), dtype=np.complex_)
     for i in range(n_files):
@@ -254,9 +263,9 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
                 # reference amplitude from dataset 0 and frequency j
                 amp_ref = ref_modes[0, j, :].reshape(n_ref, -1)
                 amp_ref_t = ref_modes[0, j, :].reshape(1, n_ref)
-                # alpha[i * n_rov:i * n_rov + n_rov, j] = amp[:, 0]/amp_ref[:, 0]
-                alpha_ij = 1 / (amp_ref_t @ amp_ref) * amp_t @ amp
-                alpha[i * n_rov:i * n_rov + n_rov, j] = alpha_ij
+                alpha[i * n_rov:i * n_rov + n_rov, j] = amp[:, ref_idx[j]]/amp_ref[:, ref_idx[j]]
+                # alpha_ij = min(1 / (amp_ref_t @ amp_ref) * amp)
+                # alpha[i * n_rov:i * n_rov + n_rov, j] = alpha_ij
             else:
                 # modal amplitude of dataset i and frequency j
                 amp = ref_modes[i, j]
@@ -283,14 +292,7 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
     return wn_out, zeta_out, phi_out
 
 
-def save_and_start(filename, animation):
-    print("Saving Animation...")
-    animation.save(filename, writer='pillow')
-    print(f"Animation stored to {filename}!")
-
-
 def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=True):
-
     # Create a custom symmetrical colormap
     def symmetrical_colormap(cmap):
         n = 128
@@ -330,17 +332,12 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
     N_temp[:, :2] = N
     N = N_temp
 
-    norm = colors.Normalize(vmin=-np.max(np.abs(N[:, 2])) * 1.3, vmax=np.max(np.abs(N[:, 2])) * 1.3, clip=False)
-    myMap = symmetrical_colormap(cm.jet)
-
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-    title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz ({round(zeta_n * 100, 2)}%)"
-    ax.set_title(title)
-
     x = []
     y = []
     z = []
+    refined_x = []
+    refined_y = []
+    refined_z = []
     for e, element in enumerate(E):
         nodes = np.zeros((3, 3))
         for i, node_idx in enumerate(element):
@@ -348,33 +345,78 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
         x.append(nodes[:, 0])
         y.append(nodes[:, 1])
         z.append(nodes[:, 2])
-
-    def update(frame):
-        ax.clear()
-        ax.set_xlim(np.min(N[:, 0]), np.max(N[:, 0]))
-        ax.set_ylim(np.min(N[:, 1]), np.max(N[:, 1]))
-        ax.set_zlim(np.min(N[:, 2]), np.max(N[:, 2]))
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_zlabel('Z')
-        ax.set_title(title)
-        set_axes_equal(ax)
+    n_frames = 20
+    for frame in range(n_frames):
+        new_x = []
+        new_y = []
+        new_z = []
         for i in range(len(E)):
             _z = z[i] * np.cos(np.pi / 5 * frame)
             triang = tri.Triangulation(x[i], y[i])
             refiner = tri.UniformTriRefiner(triang)
             interpolator = tri.LinearTriInterpolator(triang, _z)
-            new, new_z = refiner.refine_field(z, interpolator, subdiv=3)
+            new, new_z_temp = refiner.refine_field(z, interpolator, subdiv=3)
+            new_x.append(new.x)
+            new_y.append(new.y)
+            new_z.append(new_z_temp)
+        new_x = np.array(new_x).flatten()
+        new_y = np.array(new_y).flatten()
+        new_z = np.array(new_z).flatten()
+        refined_x.append(new_x)
+        refined_y.append(new_y)
+        refined_z.append(new_z)
 
-            ax.plot_trisurf(new.x, new.y, new_z, cmap=myMap, norm=norm, alpha=1, linewidth=0)
-            ax.plot_trisurf(x[i], y[i], _z, triangles=[[0, 1, 2]],
+    def update(frame, art0, art1):
+        art0[0].remove()
+        art1[0].remove()
+        art0[0] = ax.plot_trisurf(refined_x[frame],
+                                  refined_y[frame],
+                                  refined_z[frame],
+                                  cmap=myMap,
+                                  norm=norm,
+                                  alpha=1,
+                                  linewidth=0)
+        art1[0] = ax.plot_trisurf(N[:, 0],
+                                  N[:, 1],
+                                  N[:, 2] * np.cos(np.pi / 5 * frame),
+                                  triangles=E - 1,
+                                  cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
+                                  edgecolor='black')
+        return art0[0], art1[0]
+
+    fig = plt.figure()
+    norm = colors.Normalize(vmin=-np.max(np.abs(N[:, 2])) * 1.3, vmax=np.max(np.abs(N[:, 2])) * 1.3, clip=False)
+    myMap = symmetrical_colormap(cm.jet)
+    ax = fig.add_subplot(111, projection='3d')
+    title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz ({round(zeta_n * 100, 2)}%)"
+    ax.set_title(title)
+    ax.set_xlim(np.min(N[:, 0]), np.max(N[:, 0]))
+    ax.set_ylim(np.min(N[:, 1]), np.max(N[:, 1]))
+    ax.set_zlim(np.min(N[:, 2]), np.max(N[:, 2]))
+    ax.set_xlabel('X')
+    ax.set_ylabel('Y')
+    ax.set_zlabel('Z')
+    ax.set_title(title)
+    set_axes_equal(ax)
+    art0 = [ax.plot_trisurf(refined_x[0],
+                            refined_y[0],
+                            refined_z[0],
+                            cmap=myMap,
+                            norm=norm,
+                            alpha=1,
+                            linewidth=0)]
+    art1 = [ax.plot_trisurf(N[:, 0],
+                            N[:, 1],
+                            N[:, 2],
+                            triangles=E - 1,
                             cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
-                            edgecolor='black')
+                            edgecolor='black')]
 
-    ani = animation.FuncAnimation(fig=fig, func=update, frames=20)
+    ani = animation.FuncAnimation(fig=fig, func=update, fargs=(art0, art1), frames=n_frames, interval=20,
+                                  blit=False)
+    if plot:
+        plt.show()
     filename = f"{directory}mode_{mode_nr}_{round(f_n)}Hz.gif"
     print("Saving Animation...")
     ani.save(filename, writer='pillow', fps=50)
-    with open(filename, 'rb') as f:
-        f.flush()
     print(f"Animation saved to {filename}!")

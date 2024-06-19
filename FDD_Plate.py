@@ -102,6 +102,6 @@ if __name__ == '__main__':
                               mode_shape=mode,
                               f_n=wn[i] / 2 / np.pi,
                               zeta_n=zeta[i],
-                              directory="Animations/Plate/",
+                              directory="Animations/",
                               mode_nr=i+1,
                               plot=True)

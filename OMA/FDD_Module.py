@@ -526,12 +526,15 @@ def plot_fit(fSDOF, sSDOF, wn, zeta):
 
 
 def mode_opt(f, s1, s2, u, f_peak, plot=False):
-    # Calculate ratios between first and second singular values
+    # Eliminate nan
+    f = f[~np.isnan(f)]
+    s1 = s1[~np.isnan(s1)]
+    s2 = s2[~np.isnan(s2)]
     u = u[~np.isnan(u)]
+    # Calculate ratios between first and second singular values
     s_ratio = s1/s2
     max_ratio = np.max(s_ratio)
     u_out = u[np.where(s_ratio == max_ratio)]
-    print(u_out)
     if plot:
         # Plot first and second singular values
         plt.plot(f, 20*np.log10(s1), label="First Singular Value")
@@ -542,4 +545,5 @@ def mode_opt(f, s1, s2, u, f_peak, plot=False):
         plt.title("Singular Value Ratio")
         plt.legend()
         plt.show()
+    return u_out
 

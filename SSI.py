@@ -11,10 +11,10 @@ if __name__ == '__main__':
     cutoff = 50
 
     # Specify limits
-    f_lim = 0.05  # Pole stability (frequency)
+    f_lim = 0.02  # Pole stability (frequency)
     z_lim = 0.05  # Pole stability (damping)
-    mac_lim = 0.3  # Mode stability (MAC-Value)
-    z_max = 0.05  # Maximum damping value
+    mac_lim = 0.05  # Mode stability (MAC-Value)
+    z_max = 0.1  # Maximum damping value
     limits = [f_lim, z_lim, mac_lim, z_max]
 
     # block-rows
@@ -48,7 +48,7 @@ if __name__ == '__main__':
     oma.ssi.stabilization_diag(freqs_stable, order_stable, cutoff, plot='FDM')
 
     # Extract modal parameters at relevant frequencies
-    f_rel = [[12.5, 13.5], [17.5, 18.5]]
+    f_rel = [[12.5, 13.5], [16.5, 18.5]]
     f_n, z_n, m_n = oma.ssi.ssi_extract(f_rel, freqs_stable[0], zeta_stable[0], modes_stable[0])
     print("Natural Frequencies: ")
     print(f_n)
