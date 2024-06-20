@@ -193,7 +193,7 @@ def mps(data, fs):
 
 
 def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, window, overlap, n_seg, zeropadding,
-                  mac_threshold=0.85, plot=False):
+                  mac_threshold=0.95, plot=False):
     # variables
     nPeaks = len(fPeaks)
     n_files = len([name for name in os.listdir(path)])

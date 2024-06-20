@@ -24,10 +24,10 @@ if __name__ == '__main__':
     d_ord = 2
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename='Data/TiflisTotal.mat',
+    acc, Fs = oma.import_data(filename='Data/TiflisTotal_2.mat',
                               plot=False,
                               fs=Fs,
-                              time=500,
+                              time=1000,
                               detrend=True,
                               downsample=False,
                               cutoff=cutoff)
@@ -38,8 +38,6 @@ if __name__ == '__main__':
                                                 ord_min=ord_min,
                                                 ord_max=ord_max,
                                                 d_ord=d_ord)
-
-    # Create averaged response function
 
     # Calculate stable poles
     freqs_stable, zeta_stable, modes_stable, order_stable = oma.ssi.stabilization_calc(freqs, zeta, modes, limits)

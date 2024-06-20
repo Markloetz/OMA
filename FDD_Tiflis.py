@@ -18,13 +18,13 @@ if __name__ == '__main__':
     ref_position = [0, 0]
 
     # Cutoff frequency (band of interest)
-    cutoff = 40
+    cutoff = 25
 
     # measurement duration
     t_end = 1000
 
     # Threshold for MAC
-    mac_threshold = 0.95
+    mac_threshold = 0.99
 
     # Decide if harmonic filtering is active
     filt = False
@@ -33,7 +33,7 @@ if __name__ == '__main__':
     window = 'hann'
     n_seg = 100
     overlap = 0.5
-    zero_padding = False
+    zero_padding = True
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
     # import data
@@ -48,6 +48,8 @@ if __name__ == '__main__':
                              detrend=True,
                              cutoff=cutoff,
                              downsample=False)
+
+    print(acc.shape)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc,
