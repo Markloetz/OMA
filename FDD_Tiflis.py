@@ -10,20 +10,21 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Path of Measurement Files and other specifications
-    path = "Data/TiflisBruecke/"
+    path = "Data/TiflisBruecke2/"
     n_rov = 2
-    n_ref = 1
-    ref_channel = 0
+    n_ref = 2
+    ref_channel = [0, 3]
+    rov_channel = [1, 2]
     ref_position = [0, 0]
 
     # Cutoff frequency (band of interest)
     cutoff = 40
 
     # measurement duration
-    t_end = 500
+    t_end = 1000
 
     # Threshold for MAC
-    mac_threshold = 0.9
+    mac_threshold = 0.95
 
     # Decide if harmonic filtering is active
     filt = False
@@ -41,6 +42,7 @@ if __name__ == '__main__':
                              n_rov=n_rov,
                              n_ref=n_ref,
                              ref_channel=ref_channel,
+                             rov_channel=rov_channel,
                              ref_pos=ref_position,
                              t_meas=t_end,
                              detrend=True,

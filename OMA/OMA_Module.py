@@ -80,7 +80,7 @@ def import_data(filename, plot, fs, time, detrend, downsample, cutoff=1000):
     return data, fs_new
 
 
-def merge_data(path, fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, detrend, cutoff, downsample):
+def merge_data(path, fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos, t_meas, detrend, cutoff, downsample):
     # import data and store in one large array
     # preallocate
     n_files = len([name for name in os.listdir(path)])
@@ -98,20 +98,26 @@ def merge_data(path, fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, detrend, cu
     # Fill the merged data array
     # preallocate
     data_out = np.zeros((data.shape[0], n_rov * n_files))
-    j = 0
+    for i in range(n_files):
+        start_idx = i*(n_ref+n_rov)
+        for j, ch in enumerate(rov_channel):
+            print("out(" + str(i*n_rov+j) + ") = data(" + str(start_idx+ch) + ")")
+            data_out[:, i*n_rov+j] = data[:, start_idx+ch]
+            
+    '''j = 0
     for i, _ in enumerate(data.T):
         if n_ref == 2:
             cond = (i + 1) % (n_rov + n_ref) != 0 and (i + 1) % (n_rov + n_ref) != 3
             if cond:
-                print("out(" + str(j) + ") = data(" + str(i) + ")")
-                data_out[:, j] = data[:, i]
+                print("out(" + str(j) + ") = data(" + str(i+1) + ")")
+                data_out[:, j] = data[:, i+1]
                 j = j + 1
         else:
             cond = (i + 1) % (n_rov + n_ref) != 0
             if cond:
                 print("out(" + str(j) + ") = data(" + str(i + 1) + ")")
                 data_out[:, j] = data[:, i + 1]
-                j = j + 1
+                j = j + 1'''
 
     # Check if reference sensor(s) need to be merged into the complete dataset
     if np.mean(ref_pos) > 0:
