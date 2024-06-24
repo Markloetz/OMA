@@ -33,7 +33,7 @@ if __name__ == '__main__':
     window = 'hann'
     n_seg = 100
     overlap = 0.5
-    zero_padding = True
+    zero_padding = False
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
     # import data
@@ -110,8 +110,9 @@ if __name__ == '__main__':
     E = discretization['E']
 
     for i in range(nPeaks):
-        mode = np.zeros(PHI.shape[1] + 4)
-        mode[2:-2] = PHI[i, :].real
+        mode = np.zeros(PHI.shape[1] + 4, dtype=np.complex_q)
+        mode[2:-2] = PHI[i, :]
+        print(PHI[i, :])
         title = "Mode " + str(i + 1) + " at " + str(round(wn[i] / 2 / np.pi, 2)) + "Hz (" + str(
             round(zeta[i] * 100, 2)) + "%)"
         oma.animate_modeshape(N,
@@ -119,6 +120,6 @@ if __name__ == '__main__':
                               mode_shape=mode,
                               f_n=wn[i] / 2 / np.pi,
                               zeta_n=zeta[i],
-                              directory="Animations/Tiflis_1/",
-                              mode_nr=i+1,
+                              directory="Animations/Tiflis_2/",
+                              mode_nr=i,
                               plot=True)

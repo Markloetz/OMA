@@ -8,7 +8,7 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Cutoff frequency
-    cutoff = 50
+    cutoff = 35
 
     # Specify limits
     f_lim = 0.02  # Pole stability (frequency)
@@ -43,7 +43,7 @@ if __name__ == '__main__':
     freqs_stable, zeta_stable, modes_stable, order_stable = oma.ssi.stabilization_calc(freqs, zeta, modes, limits)
 
     # Plot Stabilization Diagram
-    oma.ssi.stabilization_diag(freqs_stable, order_stable, cutoff, plot='FDM')
+    oma.ssi.stabilization_diag(freqs_stable, order_stable, cutoff, plot='all')
 
     # Extract modal parameters at relevant frequencies
     f_rel = [[12.5, 13.5], [16.5, 18.5]]

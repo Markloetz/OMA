@@ -375,7 +375,7 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
     longest_dim = np.max([x_diff, y_diff])
     mode_shape = mode_shape / np.max(np.abs(mode_shape)) * (longest_dim / 15)
 
-    N_temp = np.zeros((N.shape[0], N.shape[1] + 1))
+    N_temp = np.zeros((N.shape[0], N.shape[1] + 1), dtype=np.complex_)
     N_temp[:, 2] = mode_shape
     N_temp[:, :2] = N
     N = N_temp
@@ -387,7 +387,7 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
     refined_y = []
     refined_z = []
     for e, element in enumerate(E):
-        nodes = np.zeros((3, 3))
+        nodes = np.zeros((3, 3), dtype=np.complex_)
         for i, node_idx in enumerate(element):
             nodes[i, :] = N[node_idx - 1, :]
         x.append(nodes[:, 0])
@@ -399,8 +399,8 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
         new_y = []
         new_z = []
         for i in range(len(E)):
-            _z = z[i] * np.cos(np.pi / 5 * frame)
-            triang = tri.Triangulation(x[i], y[i])
+            _z = z[i].real * np.cos(np.pi / 5 * frame) + z[i].imag * np.cos(np.pi / 5 * frame)
+            triang = tri.Triangulation(x[i].real, y[i].real)
             refiner = tri.UniformTriRefiner(triang)
             interpolator = tri.LinearTriInterpolator(triang, _z)
             new, new_z_temp = refiner.refine_field(z, interpolator, subdiv=3)
@@ -424,9 +424,9 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
                                   norm=norm,
                                   alpha=1,
                                   linewidth=0)
-        art1[0] = ax.plot_trisurf(N[:, 0],
-                                  N[:, 1],
-                                  N[:, 2] * np.cos(np.pi / 5 * frame),
+        art1[0] = ax.plot_trisurf(N[:, 0].real,
+                                  N[:, 1].real,
+                                  N[:, 2].real * np.cos(np.pi / 5 * frame) + N[:, 2].imag * np.sin(np.pi / 5 * frame),
                                   triangles=E - 1,
                                   cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
                                   edgecolor='black')
@@ -453,9 +453,9 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
                             norm=norm,
                             alpha=1,
                             linewidth=0)]
-    art1 = [ax.plot_trisurf(N[:, 0],
-                            N[:, 1],
-                            N[:, 2],
+    art1 = [ax.plot_trisurf(N[:, 0].real,
+                            N[:, 1].real,
+                            N[:, 2].real * np.cos(0) + N[:, 2].imag * np.sin(0),
                             triangles=E - 1,
                             cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
                             edgecolor='black')]
