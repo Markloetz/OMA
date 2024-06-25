@@ -8,7 +8,7 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Cutoff frequency
-    cutoff = 35
+    cutoff = 25
 
     # Specify limits
     f_lim = 0.02  # Pole stability (frequency)
@@ -18,10 +18,10 @@ if __name__ == '__main__':
     limits = [f_lim, z_lim, mac_lim, z_max]
 
     # block-rows
-    br = 6
+    br = 3
     ord_max = br * 12
     ord_min = 0
-    d_ord = 2
+    d_ord = 1
 
     # import data (and plot)
     acc, Fs = oma.import_data(filename='Data/TiflisTotal_2.mat',
@@ -29,7 +29,7 @@ if __name__ == '__main__':
                               fs=Fs,
                               time=1000,
                               detrend=True,
-                              downsample=False,
+                              downsample=True,
                               cutoff=cutoff)
 
     # Perform SSI algorithm

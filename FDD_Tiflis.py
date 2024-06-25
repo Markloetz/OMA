@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 100
+    n_seg = 120
     overlap = 0.5
     zero_padding = False
 
@@ -110,9 +110,8 @@ if __name__ == '__main__':
     E = discretization['E']
 
     for i in range(nPeaks):
-        mode = np.zeros(PHI.shape[1] + 4, dtype=np.complex_q)
+        mode = np.zeros(PHI.shape[1] + 4, dtype=np.complex_)
         mode[2:-2] = PHI[i, :]
-        print(PHI[i, :])
         title = "Mode " + str(i + 1) + " at " + str(round(wn[i] / 2 / np.pi, 2)) + "Hz (" + str(
             round(zeta[i] * 100, 2)) + "%)"
         oma.animate_modeshape(N,

@@ -80,8 +80,8 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
     # find platykurtic frequencies and sort them
     idx_bad = []
     # detrend kurtosis
-    kurtosis_mean =  scipy.signal.detrend(kurtosis_mean, type='linear')
-    kurtosis_mean = kurtosis_mean-np.mean(kurtosis_mean)
+    kurtosis_mean = scipy.signal.detrend(kurtosis_mean, type='linear')
+    kurtosis_mean = kurtosis_mean - np.mean(kurtosis_mean)
     for i in range(1, kurtosis_mean.shape[0]):
         if kurtosis_mean[i] <= np.min(kurtosis_mean) / 3:
             idx_bad.append(i)
@@ -129,8 +129,8 @@ def eliminate_harmonic(f, s, f_range, cutoff=100):
     # calulate indices to eliminate and interpolate linearily between
     for i in range(len(f_range)):
         if isinstance(f_range[i], np.ndarray):
-            idx_low = np.where(f == find_nearest(f, f_range[i][0]))[0]-1
-            idx_high = np.where(f == find_nearest(f, f_range[i][-1]))[0]+1
+            idx_low = np.where(f == find_nearest(f, f_range[i][0]))[0] - 1
+            idx_high = np.where(f == find_nearest(f, f_range[i][-1]))[0] + 1
             # interpolate
             idx_low = idx_low[0]
             idx_high = idx_high[0]
@@ -139,11 +139,11 @@ def eliminate_harmonic(f, s, f_range, cutoff=100):
             s_low = s[idx_low]
             s_high = s[idx_high]
             n_interpolate = idx_high - idx_low
-            seg_int = np.linspace(0, f_high-f_low, n_interpolate) * (s_high-s_low)/(f_high-f_low) + s_low
+            seg_int = np.linspace(0, f_high - f_low, n_interpolate) * (s_high - s_low) / (f_high - f_low) + s_low
             s[idx_low:idx_high, 0] = seg_int
         else:
-            idx_low = np.where(f == find_nearest(f, f_range[i]))[0]-1
-            idx_high = np.where(f == find_nearest(f, f_range[i]))[0]+1
+            idx_low = np.where(f == find_nearest(f, f_range[i]))[0] - 1
+            idx_high = np.where(f == find_nearest(f, f_range[i]))[0] + 1
             # interpolate
             idx_low = idx_low[0]
             idx_high = idx_high[0]
@@ -152,7 +152,7 @@ def eliminate_harmonic(f, s, f_range, cutoff=100):
             s_low = s[idx_low]
             s_high = s[idx_high]
             n_interpolate = idx_high - idx_low
-            seg_int = np.linspace(0, f_high-f_low, n_interpolate) * (s_high-s_low)/(f_high-f_low) + s_low
+            seg_int = np.linspace(0, f_high - f_low, n_interpolate) * (s_high - s_low) / (f_high - f_low) + s_low
             s[idx_low:idx_high, 0] = seg_int
 
     # plot singular values w.o. harmonic peaks
@@ -180,14 +180,6 @@ def cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=
     # notify user
     print("CPSD calculations started...")
 
-    # Zero padding
-    if zero_padding:
-        n_padding = 5
-        buffer = np.zeros((n_rows * n_padding, n_cols))
-        buffer[:n_rows, :] = data
-        data = buffer
-        n_rows = n_rows * n_padding
-
     # CSPD-Parameters (PyOMA) -> Use a mix between matlab default and pyoma
     # df = fs / n_rows * 2
     # n_per_seg = int(fs / df)
@@ -211,6 +203,14 @@ def cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=
                                      nperseg=n_per_seg,
                                      noverlap=n_overlap,
                                      window=window)
+            if zero_padding:
+                # apply ifft to calculate autocorrelation
+                corr = np.fft.ifft(a=sd, n=len(sd), norm='ortho').real
+                # apply triangular window
+                corr = corr[:len(corr) // 2] * scipy.signal.windows.triang(len(corr), sym=True)[:len(corr) // 2]
+                # recalculate spectral density
+                sd = np.fft.fft(corr, len(f))
+                f = np.linspace(0, max(f), len(sd))
             cpsd[i, j, :] = sd
     # notify user
     print("CPSD calculations ended...")
@@ -256,8 +256,8 @@ def prominence_adjust(x, y, cutoff):
 
     # Adjust limits
     idx = np.where(x >= cutoff)[0][0]
-    limlow = np.min(y[:idx])-(np.max(y[:idx])-np.min(y[:idx]))*0.1
-    limhigh = np.max(y[:idx])+(np.max(y[:idx])-np.min(y[:idx]))*0.1
+    limlow = np.min(y[:idx]) - (np.max(y[:idx]) - np.min(y[:idx])) * 0.1
+    limhigh = np.max(y[:idx]) + (np.max(y[:idx]) - np.min(y[:idx])) * 0.1
     ax.set_ylim([limlow, limhigh])
 
     # Add a slider
@@ -300,8 +300,8 @@ def peak_picking(x, y, y2, n_sval=1, cutoff=100):
     ax.set_xlim([0, cutoff])
     # Adjust limits
     idx = np.where(x >= cutoff)[0][0]
-    limlow = np.min(y[:idx])-(np.max(y[:idx])-np.min(y[:idx]))*0.1
-    limhigh = np.max(y[:idx])+(np.max(y[:idx])-np.min(y[:idx]))*0.1
+    limlow = np.min(y[:idx]) - (np.max(y[:idx]) - np.min(y[:idx])) * 0.1
+    limhigh = np.max(y[:idx]) + (np.max(y[:idx]) - np.min(y[:idx])) * 0.1
     ax.set_ylim([limlow, limhigh])
     # Store the selected points
     selected_points = {'x': [], 'y': []}
@@ -474,12 +474,12 @@ def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30, plot=False):
     fn_est = 1 / np.mean(np.diff(t[minmax_fit_idx]) * 2)
     # plot the minima and maxima over the free decay
     if plot:
-        plt.plot(t, sdof_corr, label='Autocorrelation of SDOF bell at '+str(fn_est)+' Hz')
+        plt.plot(t, sdof_corr, label='Autocorrelation of SDOF bell at ' + str(fn_est) + ' Hz')
         # plt.plot(t[minmax_fit_idx], minmax_fit)
         plt.grid(visible=True, which='minor')
         plt.xlabel('Time Delay (s)')
         plt.ylabel('Normalized Amplitude ()')
-        plt.title('Autocorrelation of SDOF bell at '+str(round(fn_est, 2))+' Hz')
+        plt.title('Autocorrelation of SDOF bell at ' + str(round(fn_est, 2)) + ' Hz')
         plt.show()
     # Fit damping ratio
     delta = np.array([2 * np.log(np.abs(minmax[0]) / np.abs(minmax[_i])) for _i in range(len(minmax_fit))])
@@ -491,6 +491,8 @@ def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30, plot=False):
     zeta_fit = m / np.sqrt(4 * np.pi ** 2 + m ** 2)
     fn_fit = fn_est / np.sqrt(1 - zeta_fit ** 2)
 
+    if len(y) < 3:
+        return np.nan, np.nan
     return fn_fit * 2 * np.pi, zeta_fit
 
 
@@ -532,12 +534,12 @@ def mode_opt(f, s1, s2, u, f_peak, plot=False):
     s2 = s2[~np.isnan(s2)]
     u = u[~np.isnan(u)]
     # Calculate ratios between first and second singular values
-    s_ratio = s1/s2
+    s_ratio = s1 / s2
     max_ratio = np.max(s_ratio)
     u_out = u[np.where(s_ratio == max_ratio)]
     if plot:
         # Plot first and second singular values
-        plt.plot(f, 20*np.log10(s1), label="First Singular Value")
+        plt.plot(f, 20 * np.log10(s1), label="First Singular Value")
         plt.plot(f, 20 * np.log10(s2), label="Second Singular Value")
         plt.axvline(x=f_peak, color='black')
         plt.xlabel("f (Hz)")
@@ -546,4 +548,3 @@ def mode_opt(f, s1, s2, u, f_peak, plot=False):
         plt.legend()
         plt.show()
     return u_out
-

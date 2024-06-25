@@ -269,7 +269,10 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
                 fSDOF_temp = fSDOF[:, j][~np.isnan(fSDOF[:, j])]
                 sSDOF_temp_1 = sSDOF[:, j][~np.isnan(sSDOF[:, j])]
                 sSDOF_temp_2 = sSDOF_2[:, j][~np.isnan(sSDOF_2[:, j])]
-                color = ((nPeaks - j) / nPeaks, (j + 1) / nPeaks, (nPeaks - j) / nPeaks, 1)
+                if nPeaks > 1:
+                    color = ((nPeaks - j) / nPeaks, (j + 1) / nPeaks, (nPeaks - j) / nPeaks, 1)
+                else:
+                    color = (0, 0, 0, 1)
                 plt.plot(fSDOF_temp, 20 * np.log10(sSDOF_temp_1), color=color)
                 plt.plot(fSDOF_temp, 20 * np.log10(sSDOF_temp_2), color=color)
                 plt.axvline(x=fPeaks[j], color='red', label="f = " + str(round(fPeaks[j])) + " Hz")
@@ -399,11 +402,11 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
         new_y = []
         new_z = []
         for i in range(len(E)):
-            _z = z[i].real * np.cos(np.pi / 5 * frame) + z[i].imag * np.cos(np.pi / 5 * frame)
+            _z = z[i].real * np.cos(np.pi / 5 * frame) + np.real(z[i].imag) * np.cos(np.pi / 5 * frame)
             triang = tri.Triangulation(x[i].real, y[i].real)
             refiner = tri.UniformTriRefiner(triang)
             interpolator = tri.LinearTriInterpolator(triang, _z)
-            new, new_z_temp = refiner.refine_field(z, interpolator, subdiv=3)
+            new, new_z_temp = refiner.refine_field(_z, interpolator, subdiv=3)
             new_x.append(new.x)
             new_y.append(new.y)
             new_z.append(new_z_temp)
@@ -417,45 +420,45 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
     def update(frame, art0, art1):
         art0[0].remove()
         art1[0].remove()
-        art0[0] = ax.plot_trisurf(refined_x[frame],
-                                  refined_y[frame],
-                                  refined_z[frame],
+        art0[0] = ax.plot_trisurf(refined_x[frame].real,
+                                  refined_y[frame].real,
+                                  refined_z[frame].real,
                                   cmap=myMap,
                                   norm=norm,
                                   alpha=1,
                                   linewidth=0)
         art1[0] = ax.plot_trisurf(N[:, 0].real,
                                   N[:, 1].real,
-                                  N[:, 2].real * np.cos(np.pi / 5 * frame) + N[:, 2].imag * np.sin(np.pi / 5 * frame),
+                                  N[:, 2].real * np.cos(np.pi / 5 * frame) + np.real(N[:, 2].imag) * np.sin(np.pi / 5 * frame),
                                   triangles=E - 1,
                                   cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
                                   edgecolor='black')
         return art0[0], art1[0]
 
     fig = plt.figure()
-    norm = colors.Normalize(vmin=-np.max(np.abs(N[:, 2])) * 1.3, vmax=np.max(np.abs(N[:, 2])) * 1.3, clip=False)
+    norm = colors.Normalize(vmin=-np.max(np.abs(N[:, 2].real)) * 1.3, vmax=np.max(np.abs(N[:, 2].real)) * 1.3, clip=False)
     myMap = symmetrical_colormap(cm.jet)
     ax = fig.add_subplot(111, projection='3d')
     title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz ({round(zeta_n * 100, 2)}%)"
     ax.set_title(title)
-    ax.set_xlim(np.min(N[:, 0]), np.max(N[:, 0]))
-    ax.set_ylim(np.min(N[:, 1]), np.max(N[:, 1]))
-    ax.set_zlim(np.min(N[:, 2]), np.max(N[:, 2]))
+    ax.set_xlim(np.min(N[:, 0].real), np.max(N[:, 0].real))
+    ax.set_ylim(np.min(N[:, 1].real), np.max(N[:, 1].real))
+    ax.set_zlim(np.min(N[:, 2].real), np.max(N[:, 2].real))
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     ax.set_title(title)
     set_axes_equal(ax)
-    art0 = [ax.plot_trisurf(refined_x[0],
-                            refined_y[0],
-                            refined_z[0],
+    art0 = [ax.plot_trisurf(refined_x[0].real,
+                            refined_y[0].real,
+                            refined_z[0].real,
                             cmap=myMap,
                             norm=norm,
                             alpha=1,
                             linewidth=0)]
     art1 = [ax.plot_trisurf(N[:, 0].real,
                             N[:, 1].real,
-                            N[:, 2].real * np.cos(0) + N[:, 2].imag * np.sin(0),
+                            N[:, 2].real * np.cos(0) + np.real(N[:, 2].imag) * np.sin(0),
                             triangles=E - 1,
                             cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
                             edgecolor='black')]
