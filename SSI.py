@@ -1,5 +1,6 @@
 import numpy as np
 import scipy
+from matplotlib import pyplot as plt
 
 from OMA import OMA_Module as oma
 
@@ -11,20 +12,20 @@ if __name__ == '__main__':
     cutoff = 25
 
     # Specify limits
-    f_lim = 0.02  # Pole stability (frequency)
+    f_lim = 0.01  # Pole stability (frequency)
     z_lim = 0.05  # Pole stability (damping)
     mac_lim = 0.05  # Mode stability (MAC-Value)
     z_max = 0.1  # Maximum damping value
     limits = [f_lim, z_lim, mac_lim, z_max]
 
     # block-rows
-    br = 3
+    br = 4
     ord_max = br * 12
-    ord_min = 0
-    d_ord = 1
+    ord_min = 6
+    d_ord = 2
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename='Data/TiflisTotal_2.mat',
+    acc, Fs = oma.import_data(filename='Data/TiflisBruecke2/Data_190624_pos_r1_01_02_r2.mat',
                               plot=False,
                               fs=Fs,
                               time=1000,
@@ -37,13 +38,15 @@ if __name__ == '__main__':
                                                 fs=Fs,
                                                 ord_min=ord_min,
                                                 ord_max=ord_max,
-                                                d_ord=d_ord)
+                                                d_ord=d_ord,
+                                                method='DataDriven')
 
     # Calculate stable poles
     freqs_stable, zeta_stable, modes_stable, order_stable = oma.ssi.stabilization_calc(freqs, zeta, modes, limits)
 
     # Plot Stabilization Diagram
-    oma.ssi.stabilization_diag(freqs_stable, order_stable, cutoff, plot='all')
+    _, ax = oma.ssi.stabilization_diag(freqs_stable, order_stable*d_ord, cutoff, plot='all')
+    plt.show()
 
     # Extract modal parameters at relevant frequencies
     f_rel = [[12.5, 13.5], [16.5, 18.5]]
@@ -59,10 +62,14 @@ if __name__ == '__main__':
     E = discretization['E']
 
     for i in range(len(f_rel)):
-        mode = np.zeros(len(m_n[i]) + 4)
-        mode[2:-2] = m_n[i].real
+        mode = np.zeros(len(m_n[i]) + 4, dtype=np.complex_)
+        mode[2:-2] = m_n[i]
         oma.animate_modeshape(N,
                               E + 1,
                               mode_shape=mode,
-                              title="Mode " + str(i + 1) + " at " + str(round(f_n[i], 2)) + "Hz")
+                              f_n=f_n[i] / 2 / np.pi,
+                              zeta_n=zeta[i],
+                              directory="Animations/Tiflis_2/",
+                              mode_nr=i,
+                              plot=True)
 

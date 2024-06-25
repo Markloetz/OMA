@@ -1,7 +1,11 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
-import control
+from matplotlib.widgets import Slider
+
+
+class SliderValClass:
+    slider_val = 0
 
 
 # This code is a changed version of the code from pyOMA from dagghe (https://github.com/dagghe/PyOMA/tree/master) for
@@ -41,15 +45,18 @@ def projection_mat(q, l, n_ch, br):
     l21 = l[a:a + b, :a]
     l22 = l[a:a + b, a:a + b]
     l31 = l[a + b:, :a]
+    l32 = l[a + b:, a:a + b]
 
     q1 = q[:a, :]
     q2 = q[a:a + b, :]
 
     # Projection Matrix
     p_i = np.vstack((l21, l31)) @ q1
+    # Shifted Projection Matrix
+    p_i_1 = np.hstack((l31, l32)) @ np.vstack((q1, q2))
     # Output sequence
     y_i = np.hstack((l21, l22)) @ np.vstack((q1, q2))
-    return p_i, y_i
+    return p_i, p_i_1, y_i
 
 
 def sv_decomp_ssi(p):
@@ -60,7 +67,7 @@ def sv_decomp_ssi(p):
     return u, s, v_t
 
 
-def ssi_proc(data, fs, ord_min, ord_max, d_ord):
+def ssi_proc(data, fs, ord_min, ord_max, d_ord, method='DataDriven'):
     print("Stochastic Subspace Identification started...")
     # Dimensions
     n_data, n_ch = data.shape
@@ -74,10 +81,10 @@ def ssi_proc(data, fs, ord_min, ord_max, d_ord):
     q, l = qr_decomp(h=h)
 
     # Projection matrix
-    p_i, y_i = projection_mat(q=q,
-                              l=l,
-                              n_ch=n_ch,
-                              br=br)
+    p_i, p_i_1, y_i = projection_mat(q=q,
+                                     l=l,
+                                     n_ch=n_ch,
+                                     br=br)
 
     # Singular Value decomposition of projection Matrix
     u, s, v_t = sv_decomp_ssi(p=p_i)
@@ -89,7 +96,7 @@ def ssi_proc(data, fs, ord_min, ord_max, d_ord):
     c_mat = 0
 
     for i in range(ord_min + d_ord, ord_max + 1, d_ord):
-        state = "     Order " + str(i) + "/" + str(ord_max + 1)
+        state = "     Order " + str(i) + "/" + str(ord_max)
         print(state)
         # Cut the results of the svd results according to the current order of the system
         u1 = u[:br * n_ch, :i]
@@ -99,11 +106,13 @@ def ssi_proc(data, fs, ord_min, ord_max, d_ord):
         obs = u1 @ s1
         # Split Matrix
         o1 = obs[:obs.shape[0] - n_ch, :]
-        o2 = obs[n_ch:, :]
+        sp = np.linalg.pinv(obs) @ p_i  # kalman state sequence
+        sp1 = np.linalg.pinv(o1) @ p_i_1  # shifted kalman state sequence
+        ac = np.vstack((sp1, y_i)) @ np.linalg.pinv(sp)
         # System matrix A
-        a_mat = np.linalg.pinv(o1) @ o2
-        # Output matrix C
-        c_mat = obs[:n_ch, :]
+        a_mat = ac[:sp1.shape[0]]
+        # Output Influence Matrix C
+        c_mat = ac[sp1.shape[0]:]
         # The eigenvalues of the system matrix determine the natural frequencies and the damping
         [mu, psi] = np.linalg.eig(a_mat)
         var_lambda = np.log(mu) * fs
@@ -153,6 +162,7 @@ def stabilization_calc(freqs, zeta, modes, limits):
                     zeta_stable_in_f_d_m.append(z_cur)
                     modes_stable_in_f_d_m.append(m_cur)
                     order_stable_in_f_d_m.append(i)
+                    continue
                 # stable in frequency and damping
                 elif np.abs(f_old - f_cur) / f_cur <= limits[0] and \
                         np.abs(z_old - z_cur) / z_cur <= limits[1]:
@@ -160,6 +170,7 @@ def stabilization_calc(freqs, zeta, modes, limits):
                     zeta_stable_in_f_d.append(z_cur)
                     modes_stable_in_f_d.append(m_cur)
                     order_stable_in_f_d.append(i)
+                    continue
                 # stable in frequency:
                 elif np.abs(f_old - f_cur) / f_cur <= limits[0]:
                     freqs_stable_in_f.append(f_cur)
@@ -176,11 +187,13 @@ def stabilization_calc(freqs, zeta, modes, limits):
 
 
 def stabilization_diag(freqs, order, cutoff, plot='FDM'):
-    # Plot Stabilization Diagram
+    # Create a figure and axis object
+    fig, ax = plt.subplots()
+
     handles = []
     if plot == 'FDM':
         for i, f in enumerate(freqs[0]):
-            plt.scatter(f, [order[0][i]], marker='x', c='black')
+            ax.scatter(f, [order[0][i]], marker='x', c='black')
         # Manually add a legend
         point0 = plt.Line2D([0], [0],
                             label='Stable in Frequency, Damping and Mode Shape',
@@ -190,7 +203,7 @@ def stabilization_diag(freqs, order, cutoff, plot='FDM'):
         handles = [point0]
     elif plot == 'all':
         for i, f in enumerate(freqs[0]):
-            plt.scatter(f, [order[0][i]], marker='x', c='black')
+            ax.scatter(f, [order[0][i]], marker='x', c='black')
         # Manually add a legend
         point0 = plt.Line2D([0], [0],
                             label='Stable in Frequency, Damping and Mode Shape',
@@ -198,7 +211,7 @@ def stabilization_diag(freqs, order, cutoff, plot='FDM'):
                             color='black',
                             linestyle='')
         for i, f in enumerate(freqs[1]):
-            plt.scatter(f, [order[1][i]], marker='o', c='black', alpha=0.6)
+            ax.scatter(f, [order[1][i]], marker='o', c='black', alpha=0.6)
         # Manually add a legend
         point1 = plt.Line2D([0], [0],
                             label='Stable in Frequency and Damping',
@@ -207,7 +220,7 @@ def stabilization_diag(freqs, order, cutoff, plot='FDM'):
                             alpha=0.6,
                             linestyle='')
         for i, f in enumerate(freqs[2]):
-            plt.scatter(f, [order[2][i]], marker='.', c='black', alpha=0.3)
+            ax.scatter(f, [order[2][i]], marker='.', c='black', alpha=0.3)
         # Manually add a legend
         point2 = plt.Line2D([0], [0],
                             label='Stable in Frequency',
@@ -217,14 +230,14 @@ def stabilization_diag(freqs, order, cutoff, plot='FDM'):
                             linestyle='')
         handles = [point0, point1, point2]
 
-    # overlay SVD
+    ax.set_xlim([0, cutoff])
+    ax.set_xlabel("f (Hz)")
+    ax.set_ylabel("Model Order")
+    ax.grid(visible=True, which='both')
+    ax.legend(handles=handles)
 
-    plt.xlim([0, cutoff])
-    plt.xlabel("f (Hz)")
-    plt.ylabel("Model Order")
-    plt.grid(visible=True, which='both')
-    plt.legend(handles=handles)
-    plt.show()
+    # Return the axis object
+    return fig, ax
 
 
 def ssi_extract(ranges, freqs, zeta, modes):
@@ -251,3 +264,124 @@ def ssi_extract(ranges, freqs, zeta, modes):
         modes_out.append(m_avg)
 
     return freqs_out, zeta_out, modes_out
+
+
+def prominence_adjust_ssi(x, y, freqs, order, cutoff, plot='all'):
+    # Adjusting peak-prominence with slider
+    min_prominence = 0
+    max_prominence = abs(max(y))
+    # Create the plot
+    figure, ax1 = stabilization_diag(freqs=freqs,
+                                     order=order,
+                                     cutoff=cutoff,
+                                     plot=plot)
+    plt.subplots_adjust(bottom=0.25)
+    ax = ax1.twinx()
+    plt.subplots_adjust(bottom=0.25)  # Adjust bottom to make space for the slider
+
+    # Plot the initial data
+    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None))
+    y_data = y[locs]
+    x_data = x[locs]
+    line, = ax.plot(x_data, y_data, 'bo')
+
+    # Adjust limits
+    idx = np.where(x >= cutoff)[0][0]
+    limlow = np.min(y[:idx]) - (np.max(y[:idx]) - np.min(y[:idx])) * 0.1
+    limhigh = np.max(y[:idx]) + (np.max(y[:idx]) - np.min(y[:idx])) * 0.1
+    ax.set_ylim([limlow, limhigh])
+
+    # Add a slider
+    ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
+    slider = Slider(ax_slider, 'Peak Prominence', min_prominence, max_prominence, valinit=min_prominence)
+
+    # Update Plot
+    def update(val):
+        SliderValClass.slider_val = val
+        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None))
+        y_data_current = y[locs_]
+        x_data_current = x[locs_]
+        line.set_xdata(x_data_current)
+        line.set_ydata(y_data_current)
+        figure.canvas.draw_idle()
+
+    slider.on_changed(update)
+    ax.plot(x, y)
+    ax.set_xlabel('f (Hz)')
+    ax.set_ylabel('Singular Values (dB)')
+    ax.set_xlim([0, cutoff])
+    # figure.tight_layout()
+    plt.show()
+
+    return SliderValClass.slider_val
+
+
+def peak_picking_ssi(x, y, freqs, order, cutoff=100, plot='all'):
+    y = y.ravel()
+    x = x.ravel()
+
+    # get prominence
+    locs, _ = scipy.signal.find_peaks(y,
+                                      prominence=(prominence_adjust_ssi(x=x,
+                                                                        y=y,
+                                                                        freqs=freqs,
+                                                                        order=order,
+                                                                        cutoff=cutoff,
+                                                                        plot=plot),
+                                                  None))
+    y_data = y[locs]
+    x_data = x[locs]
+    # Peak Picking
+    # Create a figure and axis
+    figure, ax_1 = stabilization_diag(freqs, order, cutoff, plot=plot)
+    ax = ax_1.twinx()
+    # Adjust limits
+    idx = np.where(x >= cutoff)[0][0]
+    limlow = np.min(y[:idx]) - (np.max(y[:idx]) - np.min(y[:idx])) * 0.1
+    limhigh = np.max(y[:idx]) + (np.max(y[:idx]) - np.min(y[:idx])) * 0.1
+    ax.set_ylim([limlow, limhigh])
+    # Store the selected points
+    selected_points = {'x': [], 'y': []}
+
+    # Function to calculate distance between two points
+    def distance(x1, y1, x2, y2):
+        return np.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2)
+
+    # Function to handle click events
+    def onclick(event):
+        if event.button == 1:  # Left mouse button
+            x, y = event.xdata, event.ydata
+
+            # Find the nearest blue point
+            distances = [distance(x, y, xi, yi) for xi, yi in zip(x_data, y_data)]
+            nearest_index = np.argmin(distances)
+            nearest_x, nearest_y = x_data[nearest_index], y_data[nearest_index]
+
+            # Store the selected point
+            selected_points['x'].append(nearest_x)
+            selected_points['y'].append(nearest_y)
+            ax.plot(nearest_x, nearest_y, 'ro')  # Plot the selected point in red
+            plt.draw()
+
+    # Connect the onclick function to the figure
+    _ = figure.canvas.mpl_connect('button_press_event', onclick)
+
+    # Plot the blue data points
+    ax.plot(x, y)
+    ax.plot(x_data, y_data, 'bo')  # Plot the data points in blue
+    ax.set_title('Click to select points')
+    ax.set_xlabel('f (Hz)')
+    ax.set_ylabel('Singular Values (dB)')
+    figure.tight_layout()
+    # Show the plot
+    plt.show()
+    # remove multiple entries at same spot
+    for i in range(1, len(selected_points['x'])):
+        if selected_points['x'][i] == selected_points['x'][i - 1]:
+            del selected_points['x'][i]
+            del selected_points['y'][i]
+
+    # Store number of selected points
+    n_points = len(selected_points['x'])
+    y_out = np.array(selected_points['y'])
+    return selected_points['x'], 10 ** (y_out / 20), n_points
