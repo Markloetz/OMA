@@ -139,7 +139,7 @@ def toeplitz(data, fs, Ts=0.5):
     return T1
 
 
-def ssi_proc(data, fs, ord_min, ord_max, d_ord, method='CovarianceDriven'):
+def ssi_proc(data, fs, ord_min, ord_max, d_ord, method='CovarianceDriven', Ts=1):
     print("Stochastic Subspace Identification started...")
     # Dimensions
     n_data, n_ch = data.shape
@@ -196,7 +196,7 @@ def ssi_proc(data, fs, ord_min, ord_max, d_ord, method='CovarianceDriven'):
     elif method == 'CovarianceDriven':
         # Calculate Toeplitz-Matrix
         tm = toeplitz(data=data,
-                      Ts=0.2,
+                      Ts=Ts,
                       fs=fs)
 
         # Singular Value decomposition of projection Matrix

@@ -28,20 +28,20 @@ if __name__ == '__main__':
 
     # SSI-Parameters
     # Specify limits
-    f_lim = 0.03  # Pole stability (frequency)
-    z_lim = 0.05  # Pole stability (damping)
-    mac_lim = 0.1  # Mode stability (MAC-Value)
+    f_lim = 0.01  # Pole stability (frequency)
+    z_lim = 0.04  # Pole stability (damping)
+    mac_lim = 0.05  # Mode stability (MAC-Value)
     z_max = 0.1  # Maximum damping value
     limits = [f_lim, z_lim, mac_lim, z_max]
 
     # block-rows
-    ord_max = 70
-    ord_min = 5
+    ord_max = 50
+    ord_min = 10
     d_ord = 1
 
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 80
+    n_seg = 100
     overlap = 0.5
     zero_padding = False
 
@@ -56,7 +56,7 @@ if __name__ == '__main__':
                              ref_pos=ref_position,
                              t_meas=t_end,
                              detrend=True,
-                             cutoff=cutoff,
+                             cutoff=cutoff*2,
                              downsample=False)
 
     # Build CPSD-Matrix from acceleration data
@@ -84,7 +84,8 @@ if __name__ == '__main__':
                                                 ord_min=ord_min,
                                                 ord_max=ord_max,
                                                 d_ord=d_ord,
-                                                method='CovarianceDriven')
+                                                method='CovarianceDriven',
+                                                Ts=0.8)
 
     # Calculate stable poles
     freqs_stable, zeta_stable, modes_stable, order_stable = oma.ssi.stabilization_calc(freqs, zeta, modes, limits)

@@ -329,7 +329,7 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
 
 
 def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, limits, ord_min, ord_max, d_ord,
-                      plot=False, mode_extract=False, cutoff=100):
+                      plot=False, mode_extract=False, cutoff=100, Ts=1):
     # variables
     nPeaks = len(fPeaks)
     n_files = len([name for name in os.listdir(path)])
@@ -359,7 +359,8 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPea
                                                 ord_min=ord_min,
                                                 ord_max=ord_max,
                                                 d_ord=d_ord,
-                                                method='CovarianceDriven')
+                                                method='CovarianceDriven',
+                                                Ts=Ts)
 
         # Calculate stable poles
         freqs_stable, zeta_stable, modes_stable, order_stable = ssi.stabilization_calc(freqs, zeta, modes, limits)

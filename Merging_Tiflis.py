@@ -25,7 +25,7 @@ if __name__ == '__main__':
                                        time=t_meas,
                                        detrend=True,
                                        downsample=False,
-                                       cutoff=Fs // 2)
+                                       cutoff=50)
         data[:, i * (n_rov + n_ref):(i + 1) * (n_rov + n_ref)] = data_temp
 
     # Fill the merged data array
