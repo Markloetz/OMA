@@ -14,32 +14,30 @@ if __name__ == '__main__':
     # Specify limits
     f_lim = 0.01  # Pole stability (frequency)
     z_lim = 0.05  # Pole stability (damping)
-    mac_lim = 0.05  # Mode stability (MAC-Value)
+    mac_lim = 0.9  # Mode stability (MAC-Value)
     z_max = 0.1  # Maximum damping value
     limits = [f_lim, z_lim, mac_lim, z_max]
 
     # block-rows
-    br = 4
-    ord_max = br * 12
-    ord_min = 6
-    d_ord = 2
+    ord_max = 70
+    ord_min = 5
+    d_ord = 1
 
     # import data (and plot)
-    acc, Fs = oma.import_data(filename='Data/TiflisBruecke2/Data_190624_pos_r1_01_02_r2.mat',
+    acc, Fs = oma.import_data(filename='Data/TiflisTotal_2.mat',
                               plot=False,
                               fs=Fs,
                               time=1000,
                               detrend=True,
                               downsample=True,
                               cutoff=cutoff)
-
     # Perform SSI algorithm
     freqs, zeta, modes, A, C = oma.ssi.ssi_proc(acc,
                                                 fs=Fs,
                                                 ord_min=ord_min,
                                                 ord_max=ord_max,
                                                 d_ord=d_ord,
-                                                method='DataDriven')
+                                                method='CovarianceDriven')
 
     # Calculate stable poles
     freqs_stable, zeta_stable, modes_stable, order_stable = oma.ssi.stabilization_calc(freqs, zeta, modes, limits)
@@ -50,7 +48,7 @@ if __name__ == '__main__':
 
     # Extract modal parameters at relevant frequencies
     f_rel = [[12.5, 13.5], [16.5, 18.5]]
-    f_n, z_n, m_n = oma.ssi.ssi_extract(f_rel, freqs_stable[0], zeta_stable[0], modes_stable[0])
+    f_n, z_n, m_n = oma.ssi.ssi_extract(f_rel, freqs_stable[2], zeta_stable[2], modes_stable[2])
     print("Natural Frequencies: ")
     print(f_n)
     print("Modal Damping: ")

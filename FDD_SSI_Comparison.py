@@ -28,9 +28,9 @@ if __name__ == '__main__':
 
     # SSI-Parameters
     # Specify limits
-    f_lim = 0.01  # Pole stability (frequency)
-    z_lim = 0.1  # Pole stability (damping)
-    mac_lim = 0.2  # Mode stability (MAC-Value)
+    f_lim = 0.02  # Pole stability (frequency)
+    z_lim = 0.08  # Pole stability (damping)
+    mac_lim = 0.1  # Mode stability (MAC-Value)
     z_max = 0.1  # Maximum damping value
     limits = [f_lim, z_lim, mac_lim, z_max]
 
@@ -38,11 +38,11 @@ if __name__ == '__main__':
     br = 4
     ord_max = br * 12
     ord_min = 6
-    d_ord = 2
+    d_ord = 1
 
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 120
+    n_seg = 50
     overlap = 0.5
     zero_padding = False
 
@@ -70,7 +70,7 @@ if __name__ == '__main__':
 
     # SVD of CPSD-matrix @ each frequency
     S, U, S2, U2 = oma.fdd.sv_decomp(mCPSD)
-
+    '''
     # SSI
     # Perform SSI algorithm
     freqs, zeta, modes, A, C = oma.ssi.ssi_proc(acc,
@@ -90,7 +90,9 @@ if __name__ == '__main__':
                                                      order=order_stable,
                                                      cutoff=cutoff,
                                                      plot='all')
-
+    '''
+    # Peak-picking
+    fPeaks, Peaks, nPeaks = oma.fdd.peak_picking(vf, 20 * np.log10(S), 20 * np.log10(S2), n_sval=1, cutoff=cutoff)
     '''Extract modal damping by averaging over the damping values of each dataset'''
     '''
     wn, zeta, PHI = oma.modal_extract(path=path,
@@ -109,20 +111,20 @@ if __name__ == '__main__':
                                       plot=True)'''
 
     '''Same for SSI'''
-    wn, zeta, PHI = oma.ssi_extract(path=path,
-                                    Fs=Fs,
-                                    n_rov=n_rov,
-                                    n_ref=n_ref,
-                                    ref_channel=ref_channel,
-                                    ref_pos=ref_position,
-                                    t_meas=t_end,
-                                    fPeaks=fPeaks,
-                                    limits=limits,
-                                    ord_min=ord_min,
-                                    ord_max=ord_max,
-                                    d_ord=d_ord,
-                                    plot=True,
-                                    cutoff=cutoff)
+    wn, zeta, PHI = oma.modal_extract_ssi(path=path,
+                                          Fs=Fs,
+                                          n_rov=n_rov,
+                                          n_ref=n_ref,
+                                          ref_channel=ref_channel,
+                                          ref_pos=ref_position,
+                                          t_meas=t_end,
+                                          fPeaks=fPeaks,
+                                          limits=limits,
+                                          ord_min=ord_min,
+                                          ord_max=ord_max,
+                                          d_ord=d_ord,
+                                          plot=True,
+                                          cutoff=cutoff)
 
     # Print Damping and natural frequencies
     print("Natural Frequencies [Hz]:")

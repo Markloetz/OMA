@@ -328,7 +328,7 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
     return wn_out, zeta_out, phi_out
 
 
-def ssi_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, limits, ord_min, ord_max, d_ord,
+def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, limits, ord_min, ord_max, d_ord,
                 plot=False, cutoff=100):
     # variables
     nPeaks = len(fPeaks)
@@ -356,7 +356,7 @@ def ssi_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, li
                                                 ord_min=ord_min,
                                                 ord_max=ord_max,
                                                 d_ord=d_ord,
-                                                method='DataDriven')
+                                                method='CovarianceDriven')
 
         # Calculate stable poles
         freqs_stable, zeta_stable, modes_stable, order_stable = ssi.stabilization_calc(freqs, zeta, modes, limits)
@@ -364,7 +364,7 @@ def ssi_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, li
         # Frequency Ranges
         f_rel = []
         for j in range(nPeaks):
-            f_rel.append([fPeaks[j] - 0.5, fPeaks[j] + 0.5])
+            f_rel.append([fPeaks[j] - 0.15, fPeaks[j] + 0.15])
 
         # Plot Stabilization Diagram
         _, ax = ssi.stabilization_diag(freqs_stable, order_stable * d_ord, cutoff, plot='all')
@@ -374,13 +374,15 @@ def ssi_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, li
 
         # Extract modal parameters at relevant frequencies
         f_n, z_n, m_n = ssi.ssi_extract(f_rel, freqs_stable[0], zeta_stable[0], modes_stable[0])
+        print(f_n)
+        print(z_n)
+        print(m_n)
+        wn[i] = np.array(f_n)
+        zeta[i] = np.array(z_n)
         for j in range(nPeaks):
-            wn[i, j] = f_n[j]
-            zeta[i, j] = z_n[j]
-
-        for j in range(nPeaks):
-            ref_modes[i, j] = m_n[j][ref_channel]
-            rov_modes[i, j] = np.delete(m_n[j], ref_channel, axis=0)
+            if ~np.isnan(m_n[j]).any():
+                ref_modes[i, j] = m_n[j][ref_channel]
+                rov_modes[i, j] = np.delete(m_n[j], ref_channel, axis=0)
 
     # Average damping and scaling over all datasets
     wn_out = np.mean(wn)

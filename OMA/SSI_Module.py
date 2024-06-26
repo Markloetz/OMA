@@ -1,11 +1,68 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import scipy
+from scipy.signal import fftconvolve, correlate
 from matplotlib.widgets import Slider
 
 
 class SliderValClass:
     slider_val = 0
+
+
+def NExT(x, dt, Ts, method=2):
+    """
+    Implements the Natural Excitation Technique to retrieve the Impulse Response Function (IRF)
+    from the cross-correlation of the measured output y.
+
+    Parameters:
+    x (numpy.ndarray): time series of ambient vibrations (1D or 2D array)
+    dt (float): Time step
+    Ts (float): Duration of subsegments (T < dt * (len(y) - 1))
+    method (int): 1 to use the fft without zero padding, 2 to use cross-correlation with zero padding (default: 2)
+
+    Returns:
+    tuple: (IRF, t)
+        - IRF (numpy.ndarray): impulse response function
+        - t (numpy.ndarray): time vector associated with the IRF
+    """
+    if len(x.shape) == 1:
+        x = x[np.newaxis, :]  # Convert to 2D array with a single row if x is a 1D array
+
+    Nxx, _ = x.shape
+
+    # Maximal segment length fixed by T
+    M = round(Ts / dt)
+
+    if method == 1:
+        IRF = np.zeros((Nxx, Nxx, M))
+        for oo in range(Nxx):
+            for jj in range(Nxx):
+                y1 = np.fft.fft(x[oo, :])
+                y2 = np.fft.fft(x[jj, :])
+                h0 = np.fft.ifft(y1 * np.conj(y2))
+                IRF[oo, jj, :] = h0[:M].real
+        # Time vector t associated to the IRF
+        t = np.arange(M) * dt
+        if Nxx == 1:
+            IRF = IRF.squeeze().T
+
+    else:  # method == 2
+        IRF = np.zeros((Nxx, Nxx, M + 1))
+        for oo in range(Nxx):
+            for jj in range(Nxx):
+                dummy = correlate(x[oo, :], x[jj, :], mode='full', method='auto') / len(x[oo, :])
+                mid = len(dummy) // 2
+                IRF[oo, jj, :] = dummy[mid:mid + M + 1]
+        if Nxx == 1:
+            IRF = IRF.squeeze().T
+        # Time vector t associated to the IRF
+        t = dt * np.arange(0, M + 1)
+
+    # Normalize the IRF
+    if Nxx == 1:
+        IRF = IRF / IRF[0]
+
+    return IRF, t
 
 
 # This code is a changed version of the code from pyOMA from dagghe (https://github.com/dagghe/PyOMA/tree/master) for
@@ -67,60 +124,107 @@ def sv_decomp_ssi(p):
     return u, s, v_t
 
 
-def ssi_proc(data, fs, ord_min, ord_max, d_ord, method='DataDriven'):
+def toeplitz(data, fs, Ts=1):
+    print("     Computation of the Toeplitz-Matrix...")
+    h, _ = NExT(x=data.T, dt=1 / fs, Ts=Ts)
+    N1 = round(h.shape[2] / 2) - 1
+    M = h.shape[1]
+    T1 = np.zeros((N1 * M, N1 * M))
+
+    for oo in range(1, N1 + 1):
+        for ll in range(1, N1 + 1):
+            T1[(oo - 1) * M: oo * M, (ll - 1) * M: ll * M] = h[:, :, N1 + oo - ll]
+    print("     Computation of the Toeplitz-Matrix complete!")
+    # return Toeplitz Matrices
+    return T1
+
+
+def ssi_proc(data, fs, ord_min, ord_max, d_ord, method='CovarianceDriven'):
     print("Stochastic Subspace Identification started...")
     # Dimensions
     n_data, n_ch = data.shape
     br = ord_max // n_ch
-
-    # Calculate Block-Hankel-Matrix
-    h = block_hankel_matrix(data=data,
-                            br=br)
-
-    # QR-factorization
-    q, l = qr_decomp(h=h)
-
-    # Projection matrix
-    p_i, p_i_1, y_i = projection_mat(q=q,
-                                     l=l,
-                                     n_ch=n_ch,
-                                     br=br)
-
-    # Singular Value decomposition of projection Matrix
-    u, s, v_t = sv_decomp_ssi(p=p_i)
-
+    # Pre-allocations
     freqs = []
     zeta = []
     phi = []
     a_mat = 0
     c_mat = 0
+    if method == 'DataDriven':
 
-    for i in range(ord_min + d_ord, ord_max + 1, d_ord):
-        state = "     Order " + str(i) + "/" + str(ord_max)
-        print(state)
-        # Cut the results of the svd results according to the current order of the system
-        u1 = u[:br * n_ch, :i]
-        s1 = s[:i, :i]
-        # System Matrix and Output Matrix calculations
-        # Observability matrix
-        obs = u1 @ s1
-        # Split Matrix
-        o1 = obs[:obs.shape[0] - n_ch, :]
-        sp = np.linalg.pinv(obs) @ p_i  # kalman state sequence
-        sp1 = np.linalg.pinv(o1) @ p_i_1  # shifted kalman state sequence
-        ac = np.vstack((sp1, y_i)) @ np.linalg.pinv(sp)
-        # System matrix A
-        a_mat = ac[:sp1.shape[0]]
-        # Output Influence Matrix C
-        c_mat = ac[sp1.shape[0]:]
-        # The eigenvalues of the system matrix determine the natural frequencies and the damping
-        [mu, psi] = np.linalg.eig(a_mat)
-        var_lambda = np.log(mu) * fs
-        freqs.append(np.abs(var_lambda / 2 / np.pi))
-        zeta.append(np.abs(np.real(var_lambda)) / np.abs(var_lambda))
-        # The eigenvector together with the output matrix C determine the mode shapes
-        phi.append(c_mat @ psi)  # each column contains one mode shape
+        # Calculate Block-Hankel-Matrix
+        h = block_hankel_matrix(data=data,
+                                br=br)
 
+        # QR-factorization
+        q, l = qr_decomp(h=h)
+
+        # Projection matrix
+        p_i, p_i_1, y_i = projection_mat(q=q,
+                                         l=l,
+                                         n_ch=n_ch,
+                                         br=br)
+
+        # Singular Value decomposition of projection Matrix
+        u, s, v_t = sv_decomp_ssi(p=p_i)
+
+        for i in range(ord_min + d_ord, ord_max + 1, d_ord):
+            state = "     Order " + str(i) + "/" + str(ord_max)
+            print(state)
+            # Cut the results of the svd results according to the current order of the system
+            u1 = u[:br * n_ch, :i]
+            s1 = s[:i, :i]
+            # System Matrix and Output Matrix calculations
+            # Observability matrix
+            obs = u1 @ s1
+            # Split Matrix
+            o1 = obs[:obs.shape[0] - n_ch, :]
+            sp = np.linalg.pinv(obs) @ p_i  # kalman state sequence
+            sp1 = np.linalg.pinv(o1) @ p_i_1  # shifted kalman state sequence
+            ac = np.vstack((sp1, y_i)) @ np.linalg.pinv(sp)
+            # System matrix A
+            a_mat = ac[:sp1.shape[0]]
+            # Output Influence Matrix C
+            c_mat = ac[sp1.shape[0]:]
+            # The eigenvalues of the system matrix determine the natural frequencies and the damping
+            [mu, psi] = np.linalg.eig(a_mat)
+            var_lambda = np.log(mu) * fs
+            freqs.append(np.abs(var_lambda / 2 / np.pi))
+            zeta.append(np.abs(np.real(var_lambda)) / np.abs(var_lambda))
+            # The eigenvector together with the output matrix C determine the mode shapes
+            phi.append(c_mat @ psi)  # each column contains one mode shape
+    elif method == 'CovarianceDriven':
+        # Calculate Toeplitz-Matrix
+        tm = toeplitz(data=data,
+                      Ts=1,
+                      fs=fs)
+
+        # Singular Value decomposition of projection Matrix
+        u, s, v_t = sv_decomp_ssi(p=tm)
+
+        for i in range(ord_min + d_ord, ord_max + 1, d_ord):
+            state = "     Order " + str(i) + "/" + str(ord_max)
+            print(state)
+            # Cut the results of the svd results according to the current order of the system
+            u1 = u[:br * n_ch, :i]
+            s1 = s[:i, :i]
+            # System Matrix and Output Matrix calculations
+            # Observability matrix
+            obs = u1 @ s1
+            # Split Matrix
+            o1 = obs[:obs.shape[0] - n_ch, :]
+            o2 = obs[n_ch:, :]
+            # System matrix A
+            a_mat = np.linalg.pinv(o1) @ o2
+            # Output Influence Matrix C
+            c_mat = obs[:n_ch, :]
+            # The eigenvalues of the system matrix determine the natural frequencies and the damping
+            [mu, psi] = np.linalg.eig(a_mat)
+            var_lambda = np.log(mu) * fs
+            freqs.append(np.abs(var_lambda / 2 / np.pi))
+            zeta.append(np.abs(np.real(var_lambda)) / np.abs(var_lambda))
+            # The eigenvector together with the output matrix C determine the mode shapes
+            phi.append(c_mat @ psi)  # each column contains one mode shape
     # Return modal parameters
     print("Stochastic Subspace Identification complete...")
     return freqs, zeta, phi, a_mat, c_mat
@@ -157,12 +261,11 @@ def stabilization_calc(freqs, zeta, modes, limits):
                 # stable in frequency, damping and mode shape
                 if np.abs(f_old - f_cur) / f_cur <= limits[0] and \
                         np.abs(z_old - z_cur) / z_cur <= limits[1] and \
-                        mac_calc(m_old, m_cur) <= (1 - limits[2]):
+                        mac_calc(m_old, m_cur) >= (1-limits[2]):
                     freqs_stable_in_f_d_m.append(f_cur)
                     zeta_stable_in_f_d_m.append(z_cur)
                     modes_stable_in_f_d_m.append(m_cur)
                     order_stable_in_f_d_m.append(i)
-                    continue
                 # stable in frequency and damping
                 elif np.abs(f_old - f_cur) / f_cur <= limits[0] and \
                         np.abs(z_old - z_cur) / z_cur <= limits[1]:
@@ -170,7 +273,6 @@ def stabilization_calc(freqs, zeta, modes, limits):
                     zeta_stable_in_f_d.append(z_cur)
                     modes_stable_in_f_d.append(m_cur)
                     order_stable_in_f_d.append(i)
-                    continue
                 # stable in frequency:
                 elif np.abs(f_old - f_cur) / f_cur <= limits[0]:
                     freqs_stable_in_f.append(f_cur)
