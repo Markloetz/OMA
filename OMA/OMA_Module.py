@@ -184,7 +184,7 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
     n_files = len([name for name in os.listdir(path)])
     # Preallocate arrays natural frequencies, damping and the reference/roving modes
     wn = np.zeros((n_files, nPeaks))
-    zeta = np.zeros((n_files, nPeaks))
+    zetan = np.zeros((n_files, nPeaks))
     ref_modes = np.zeros((n_files, nPeaks, n_ref), dtype=np.complex_)
     rov_modes = np.zeros((n_files, nPeaks, n_rov), dtype=np.complex_)
 
@@ -269,15 +269,15 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
 
         # Get the Damping Value by fitting the SDOFs in frequency domain
         for j in range(nPeaks):
-            wn[i, j], zeta[i, j] = fdd.sdof_time_domain_fit(y=sSDOF[:, j],
-                                                            f=vf,
-                                                            n_skip=0,
-                                                            n_peaks=30,
-                                                            plot=False)
+            wn[i, j], zetan[i, j] = fdd.sdof_time_domain_fit(y=sSDOF[:, j],
+                                                             f=vf,
+                                                             n_skip=0,
+                                                             n_peaks=30,
+                                                             plot=False)
 
     # Average damping and scaling over all datasets
     wn_out = np.mean(wn, axis=0)
-    zeta_out = np.mean(zeta, axis=0)
+    zeta_out = np.mean(zetan, axis=0)
 
     # decide which one of the reference sensors is used for the scaling
     ref_idx = []
@@ -329,16 +329,19 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
 
 
 def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, limits, ord_min, ord_max, d_ord,
-                plot=False, cutoff=100):
+                      plot=False, mode_extract=False, cutoff=100):
     # variables
     nPeaks = len(fPeaks)
     n_files = len([name for name in os.listdir(path)])
     # Preallocate arrays natural frequencies, damping and the reference/roving modes
     wn = np.zeros((n_files, nPeaks))
-    zeta = np.zeros((n_files, nPeaks))
+    zetan = np.zeros((n_files, nPeaks))
     ref_modes = np.zeros((n_files, nPeaks, n_ref), dtype=np.complex_)
     rov_modes = np.zeros((n_files, nPeaks, n_rov), dtype=np.complex_)
-
+    # Frequency Ranges
+    f_rel = []
+    for j in range(nPeaks):
+        f_rel.append([fPeaks[j] - 0.5, fPeaks[j] + 0.5])
     # Import Data and do EFDD procedure for each dataset
     for i, filename in enumerate(glob.glob(os.path.join(path, '*.mat'))):
         data, _ = import_data(filename=filename,
@@ -361,79 +364,92 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPea
         # Calculate stable poles
         freqs_stable, zeta_stable, modes_stable, order_stable = ssi.stabilization_calc(freqs, zeta, modes, limits)
 
-        # Frequency Ranges
-        f_rel = []
-        for j in range(nPeaks):
-            f_rel.append([fPeaks[j] - 0.15, fPeaks[j] + 0.15])
-
         # Plot Stabilization Diagram
-        _, ax = ssi.stabilization_diag(freqs_stable, order_stable * d_ord, cutoff, plot='all')
+        fig, ax = ssi.stabilization_diag(freqs_stable, order_stable * d_ord, cutoff, plot='all')
         for j in range(nPeaks):
             ax.axvspan(f_rel[j][0], f_rel[j][1], color='red', alpha=0.3)
-        plt.show()
+        if not plot:
+            plt.close(fig)
+            del fig
+            del ax
 
         # Extract modal parameters at relevant frequencies
         f_n, z_n, m_n = ssi.ssi_extract(f_rel, freqs_stable[0], zeta_stable[0], modes_stable[0])
-        print(f_n)
-        print(z_n)
-        print(m_n)
         wn[i] = np.array(f_n)
-        zeta[i] = np.array(z_n)
+        zetan[i] = np.array(z_n)
+        print(zetan)
+        print(zetan.shape)
         for j in range(nPeaks):
             if ~np.isnan(m_n[j]).any():
+                '''plt.plot(m_n[j], label="Mode of Dataset "+str(i+1)+" and f_n = "+str(f_n[j]))
+                plt.legend()
+                plt.show()'''
                 ref_modes[i, j] = m_n[j][ref_channel]
                 rov_modes[i, j] = np.delete(m_n[j], ref_channel, axis=0)
 
     # Average damping and scaling over all datasets
-    wn_out = np.mean(wn)
-    zeta_out = np.mean(zeta)
+    if plot:
+        plt.show()
 
-    # decide which one of the reference sensors is used for the scaling
-    ref_idx = []
-    if n_ref > 1:
+    # remove nan to enable averaging
+    wn_out = []
+    zeta_out = []
+    for j in range(nPeaks):
+        wn_temp = wn[~np.isnan(wn[:, j]), j]
+        zetan_temp = zetan[~np.isnan(zetan[:, j]), j]
+        print(zetan_temp)
+        wn_out.append(np.mean(wn_temp))
+        zeta_out.append(np.mean(zetan_temp))
+        print(zeta_out)
+    if mode_extract:
+        # decide which one of the reference sensors is used for the scaling
+        ref_idx = []
+        if n_ref > 1:
+            for i in range(nPeaks):
+                if np.sum(np.abs(ref_modes[:, i, 0])) > np.sum(np.abs(ref_modes[:, i, 1].real)):
+                    ref_idx.append(0)
+                else:
+                    ref_idx.append(1)
+
+        # Scale the mode shapes according to  the modal displacement of the reference coordinate
+        alpha = np.zeros((n_files * n_rov, nPeaks), dtype=np.complex_)
+        for i in range(n_files):
+            for j in range(nPeaks):
+                if n_ref > 1:
+                    # modal amplitude of dataset i and frequency j
+                    amp = ref_modes[i, j, :].reshape(n_ref, -1)
+                    # amp_t = ref_modes[i, j, :].reshape(1, n_ref)
+                    # reference amplitude from dataset 0 and frequency j
+                    amp_ref = ref_modes[0, j, :].reshape(n_ref, -1)
+                    # amp_ref_t = ref_modes[0, j, :].reshape(1, n_ref)
+                    alpha[i * n_rov:i * n_rov + n_rov, j] = amp[ref_idx[j], :] / amp_ref[ref_idx[j], :]
+                    # alpha_ij = min(1 / (amp_ref_t @ amp_ref) * amp)
+                    # alpha[i * n_rov:i * n_rov + n_rov, j] = alpha_ij
+                else:
+                    # modal amplitude of dataset i and frequency j
+                    amp = ref_modes[i, j]
+                    # reference amplitude from dataset 0 and frequency j
+                    amp_ref = ref_modes[0, j]
+                    # scaling factor
+                    alpha[i * n_rov:i * n_rov + n_rov, j] = (amp / amp_ref)
+
+        # Preallocate modeshape matrix
+        phi_not_scaled = np.zeros((nPeaks, n_rov * n_files), dtype=np.complex_)
+
+        # Rearrange roving modes in the order of measurement
         for i in range(nPeaks):
-            if np.sum(np.abs(ref_modes[:, i, 0])) > np.sum(np.abs(ref_modes[:, i, 1].real)):
-                ref_idx.append(0)
-            else:
-                ref_idx.append(1)
+            phi_not_scaled[i, :] = rov_modes[:, i, :].flatten()
 
-    # Scale the mode shapes according to  the modal displacement of the reference coordinate
-    alpha = np.zeros((n_files * n_rov, nPeaks), dtype=np.complex_)
-    for i in range(n_files):
-        for j in range(nPeaks):
-            if n_ref > 1:
-                # modal amplitude of dataset i and frequency j
-                amp = ref_modes[i, j, :].reshape(n_ref, -1)
-                # amp_t = ref_modes[i, j, :].reshape(1, n_ref)
-                # reference amplitude from dataset 0 and frequency j
-                amp_ref = ref_modes[0, j, :].reshape(n_ref, -1)
-                # amp_ref_t = ref_modes[0, j, :].reshape(1, n_ref)
-                alpha[i * n_rov:i * n_rov + n_rov, j] = amp[ref_idx[j], :] / amp_ref[ref_idx[j], :]
-                # alpha_ij = min(1 / (amp_ref_t @ amp_ref) * amp)
-                # alpha[i * n_rov:i * n_rov + n_rov, j] = alpha_ij
-            else:
-                # modal amplitude of dataset i and frequency j
-                amp = ref_modes[i, j]
-                # reference amplitude from dataset 0 and frequency j
-                amp_ref = ref_modes[0, j]
-                # scaling factor
-                alpha[i * n_rov:i * n_rov + n_rov, j] = (amp / amp_ref)
+        if np.sum(ref_pos) > 0:
+            for j, pos in enumerate(ref_pos):
+                # add reference modes to the not yet scaled roving modes
+                phi_not_scaled = np.insert(phi_not_scaled, pos - 1, ref_modes[0, :, j], axis=1)
+                # add scaling factor of 1 (none) at the positions of the reference sensors
+                alpha = np.insert(alpha, pos - 1, np.ones(nPeaks), axis=0)
 
-    # Preallocate modeshape matrix
-    phi_not_scaled = np.zeros((nPeaks, n_rov * n_files), dtype=np.complex_)
-
-    # Rearrange roving modes in the order of measurement
-    for i in range(nPeaks):
-        phi_not_scaled[i, :] = rov_modes[:, i, :].flatten()
-
-    if np.sum(ref_pos) > 0:
-        for j, pos in enumerate(ref_pos):
-            # add reference modes to the not yet scaled roving modes
-            phi_not_scaled = np.insert(phi_not_scaled, pos - 1, ref_modes[0, :, j], axis=1)
-            # add scaling factor of 1 (none) at the positions of the reference sensors
-            alpha = np.insert(alpha, pos - 1, np.ones(nPeaks), axis=0)
-
-    phi_out = phi_not_scaled * alpha.T
+        phi_out = phi_not_scaled * alpha.T
+    else:
+        phi_out = 0
     return wn_out, zeta_out, phi_out
 
 

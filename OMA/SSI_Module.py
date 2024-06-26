@@ -117,14 +117,14 @@ def projection_mat(q, l, n_ch, br):
 
 
 def sv_decomp_ssi(p):
-    print("     SVD of Projection Matrix started...")
+    print("     SVD started...")
     u, s, v_t = np.linalg.svd(p, full_matrices=False)
     s = np.sqrt(np.diag(s))
-    print("     SVD of Projection Matrix ended...")
+    print("     SVD ended...")
     return u, s, v_t
 
 
-def toeplitz(data, fs, Ts=1):
+def toeplitz(data, fs, Ts=0.5):
     print("     Computation of the Toeplitz-Matrix...")
     h, _ = NExT(x=data.T, dt=1 / fs, Ts=Ts)
     N1 = round(h.shape[2] / 2) - 1
@@ -196,7 +196,7 @@ def ssi_proc(data, fs, ord_min, ord_max, d_ord, method='CovarianceDriven'):
     elif method == 'CovarianceDriven':
         # Calculate Toeplitz-Matrix
         tm = toeplitz(data=data,
-                      Ts=1,
+                      Ts=0.2,
                       fs=fs)
 
         # Singular Value decomposition of projection Matrix
@@ -261,20 +261,23 @@ def stabilization_calc(freqs, zeta, modes, limits):
                 # stable in frequency, damping and mode shape
                 if np.abs(f_old - f_cur) / f_cur <= limits[0] and \
                         np.abs(z_old - z_cur) / z_cur <= limits[1] and \
-                        mac_calc(m_old, m_cur) >= (1-limits[2]):
+                        mac_calc(m_old, m_cur) >= (1-limits[2]) and \
+                        z_cur < limits[3]:
                     freqs_stable_in_f_d_m.append(f_cur)
                     zeta_stable_in_f_d_m.append(z_cur)
                     modes_stable_in_f_d_m.append(m_cur)
                     order_stable_in_f_d_m.append(i)
                 # stable in frequency and damping
                 elif np.abs(f_old - f_cur) / f_cur <= limits[0] and \
-                        np.abs(z_old - z_cur) / z_cur <= limits[1]:
+                        np.abs(z_old - z_cur) / z_cur <= limits[1] and \
+                        z_cur < limits[3]:
                     freqs_stable_in_f_d.append(f_cur)
                     zeta_stable_in_f_d.append(z_cur)
                     modes_stable_in_f_d.append(m_cur)
                     order_stable_in_f_d.append(i)
                 # stable in frequency:
-                elif np.abs(f_old - f_cur) / f_cur <= limits[0]:
+                elif np.abs(f_old - f_cur) / f_cur <= limits[0] and \
+                        z_cur < limits[3]:
                     freqs_stable_in_f.append(f_cur)
                     zeta_stable_in_f.append(z_cur)
                     modes_stable_in_f.append(m_cur)
