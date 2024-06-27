@@ -1,7 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import scipy
-from scipy.signal import fftconvolve, correlate
+from scipy.signal import correlate, find_peaks
 from matplotlib.widgets import Slider
 
 
@@ -267,18 +266,19 @@ def SSICOV(y, dt, Ts, ord_min, ord_max, limits):
     return fn2, zeta2, phi2, order, MAC, stability_status
 
 
-def stabilization_diag(freqs, order, label, cutoff):
+def stabilization_diag(freqs, label, cutoff):
     # Create a figure and axis object
     fig, ax = plt.subplots()
-    for i, f in enumerate(freqs):
-        if label == 1:
-            ax.scatter(f, order[i], marker='x', c='black')
-        elif label == 2:
-            ax.scatter(f, order[i], marker='o', c='black', alpha=0.6)
-        elif label == 3:
-            ax.scatter(f, order[i], marker='.', c='black', alpha=0.3)
-        elif label == 4:
-            ax.scatter(f, order[i], marker='.', c='grey', alpha=0)
+    for order in range(len(freqs)):
+        for i, f in enumerate(freqs[order]):
+            if label[order][i] == 1:
+                ax.scatter(f, order, marker='x', c='black')
+            elif label[order][i] == 2:
+                ax.scatter(f, order, marker='o', c='black', alpha=0.6)
+            elif label[order][i] == 3:
+                ax.scatter(f, order, marker='.', c='black', alpha=0.3)
+            elif label[order][i] == 4:
+                ax.scatter(f, order, marker='.', c='grey', alpha=0)
     # Manually add a legend
     point0 = plt.Line2D([0], [0],
                         label='Stable in Frequency, Damping and Mode Shape',
@@ -295,13 +295,13 @@ def stabilization_diag(freqs, order, label, cutoff):
                         label='Stable in Frequency',
                         marker='.',
                         color='black',
-                        alpha=0.3,
+                        alpha=0.6,
                         linestyle='')
     point3 = plt.Line2D([0], [0],
                         label='New Pole',
                         marker='.',
                         color='black',
-                        alpha=0,
+                        alpha=0.3,
                         linestyle='')
     handles = [point0, point1, point2, point3]
     ax.set_xlim([0, cutoff])
@@ -314,21 +314,27 @@ def stabilization_diag(freqs, order, label, cutoff):
     return fig, ax
 
 
-def ssi_extract(ranges, freqs, zeta, modes):
+def ssi_extract(freqs, zeta, modes, label, ranges):
+    # Initialize Output Arrays
     freqs_out = []
     zeta_out = []
     modes_out = []
-    # iterate over frequency ranges
-    for i, _range in enumerate(ranges):
+    f_avg = 0
+    z_avg = 0
+    m_avg = 0
+    for j, _range in enumerate(ranges):
         f_to_avg = []
         z_to_avg = []
         m_to_avg = []
-        for j in range(len(freqs)):
-            if _range[0] <= freqs[j] <= _range[1]:
-                f_to_avg.append(freqs[j])
-                z_to_avg.append(zeta[j])
-                m_to_avg.append(modes[j])
-
+        for order in range(len(freqs)):
+            # Loop over each frequency
+            for i, f in enumerate(freqs[order]):
+                # Check if frequency is stable
+                if label[order][i] == 1:
+                    if _range[0] <= f <= _range[1]:
+                        f_to_avg.append(f)
+                        z_to_avg.append(zeta[order][i])
+                        m_to_avg.append(modes[order][i])
         f_avg = np.mean(f_to_avg)
         z_avg = np.mean(z_to_avg)
         m_to_avg_arr = np.array(m_to_avg)
@@ -340,21 +346,20 @@ def ssi_extract(ranges, freqs, zeta, modes):
     return freqs_out, zeta_out, modes_out
 
 
-def prominence_adjust_ssi(x, y, freqs, order, cutoff, plot='all'):
+def prominence_adjust_ssi(x, y, freqs, label, cutoff):
     # Adjusting peak-prominence with slider
     min_prominence = 0
     max_prominence = abs(max(y))
     # Create the plot
     figure, ax1 = stabilization_diag(freqs=freqs,
-                                     order=order,
-                                     cutoff=cutoff,
-                                     plot=plot)
+                                     label=label,
+                                     cutoff=cutoff)
     plt.subplots_adjust(bottom=0.25)
     ax = ax1.twinx()
     plt.subplots_adjust(bottom=0.25)  # Adjust bottom to make space for the slider
 
     # Plot the initial data
-    locs, _ = scipy.signal.find_peaks(y, prominence=(min_prominence, None))
+    locs, _ = find_peaks(y, prominence=(min_prominence, None))
     y_data = y[locs]
     x_data = x[locs]
     line, = ax.plot(x_data, y_data, 'bo')
@@ -366,13 +371,13 @@ def prominence_adjust_ssi(x, y, freqs, order, cutoff, plot='all'):
     ax.set_ylim([limlow, limhigh])
 
     # Add a slider
-    ax_slider = plt.axes([0.25, 0.1, 0.65, 0.03], facecolor='lightgoldenrodyellow')
+    ax_slider = plt.axes((0.25, 0.1, 0.65, 0.03), facecolor='lightgoldenrodyellow')
     slider = Slider(ax_slider, 'Peak Prominence', min_prominence, max_prominence, valinit=min_prominence)
 
     # Update Plot
     def update(val):
         SliderValClass.slider_val = val
-        locs_, _ = scipy.signal.find_peaks(y, prominence=(SliderValClass.slider_val, None))
+        locs_, _ = find_peaks(y, prominence=(SliderValClass.slider_val, None))
         y_data_current = y[locs_]
         x_data_current = x[locs_]
         line.set_xdata(x_data_current)
@@ -390,24 +395,23 @@ def prominence_adjust_ssi(x, y, freqs, order, cutoff, plot='all'):
     return SliderValClass.slider_val
 
 
-def peak_picking_ssi(x, y, freqs, order, cutoff=100, plot='all'):
+def peak_picking_ssi(x, y, freqs, label, cutoff=100, plot='all'):
     y = y.ravel()
     x = x.ravel()
 
     # get prominence
-    locs, _ = scipy.signal.find_peaks(y,
-                                      prominence=(prominence_adjust_ssi(x=x,
-                                                                        y=y,
-                                                                        freqs=freqs,
-                                                                        order=order,
-                                                                        cutoff=cutoff,
-                                                                        plot=plot),
-                                                  None))
+    locs, _ = find_peaks(y,
+                         prominence=(prominence_adjust_ssi(x=x,
+                                                           y=y,
+                                                           freqs=freqs,
+                                                           label=label,
+                                                           cutoff=cutoff),
+                                     None))
     y_data = y[locs]
     x_data = x[locs]
     # Peak Picking
     # Create a figure and axis
-    figure, ax_1 = stabilization_diag(freqs, order, cutoff, plot=plot)
+    figure, ax_1 = stabilization_diag(freqs, label, cutoff)
     ax = ax_1.twinx()
     # Adjust limits
     idx = np.where(x >= cutoff)[0][0]
