@@ -9,22 +9,10 @@ class SliderValClass:
     slider_val = 0
 
 
+'''Functions needed by the SSI_COV'''
+
+
 def NExT(x, dt, Ts, method=2):
-    """
-    Implements the Natural Excitation Technique to retrieve the Impulse Response Function (IRF)
-    from the cross-correlation of the measured output y.
-
-    Parameters:
-    x (numpy.ndarray): time series of ambient vibrations (1D or 2D array)
-    dt (float): Time step
-    Ts (float): Duration of subsegments (T < dt * (len(y) - 1))
-    method (int): 1 to use the fft without zero padding, 2 to use cross-correlation with zero padding (default: 2)
-
-    Returns:
-    tuple: (IRF, t)
-        - IRF (numpy.ndarray): impulse response function
-        - t (numpy.ndarray): time vector associated with the IRF
-    """
     if len(x.shape) == 1:
         x = x[np.newaxis, :]  # Convert to 2D array with a single row if x is a 1D array
 
@@ -65,8 +53,6 @@ def NExT(x, dt, Ts, method=2):
     return IRF, t
 
 
-# This code is a changed version of the code from pyOMA from dagghe (https://github.com/dagghe/PyOMA/tree/master) for
-# the data driven SSI...
 def mac_calc(phi, u):
     # calculates mac value between phi and u
     return (np.abs(phi.conj().T @ u) ** 2) / ((phi.conj().T @ phi) * (u.conj().T @ u))
@@ -139,202 +125,185 @@ def toeplitz(data, fs, Ts=0.5):
     return T1
 
 
-def ssi_proc(data, fs, ord_min, ord_max, d_ord, method='CovarianceDriven', Ts=1):
-    print("Stochastic Subspace Identification started...")
-    # Dimensions
-    n_data, n_ch = data.shape
-    br = ord_max // n_ch
-    # Pre-allocations
-    freqs = []
-    zeta = []
-    phi = []
-    a_mat = 0
-    c_mat = 0
-    if method == 'DataDriven':
+def modalID(U, S, Nmodes, Nyy, dt):
+    if Nmodes >= S.shape[0]:
+        print(f'Warning: Nmodes is larger than the number of rows of S. Nmodes is reduced to {S.shape[0]}.')
+        Nmodes = S.shape[0]
 
-        # Calculate Block-Hankel-Matrix
-        h = block_hankel_matrix(data=data,
-                                br=br)
+    obs = U[:, :Nmodes] @ np.sqrt(S[:Nmodes, :Nmodes])
 
-        # QR-factorization
-        q, l = qr_decomp(h=h)
+    IndO = min(Nyy, obs.shape[0])
+    C = obs[:IndO, :]
+    jb = round(obs.shape[0] / IndO)
 
-        # Projection matrix
-        p_i, p_i_1, y_i = projection_mat(q=q,
-                                         l=l,
-                                         n_ch=n_ch,
-                                         br=br)
+    A = np.linalg.pinv(obs[:IndO * (jb - 1), :]) @ obs[-IndO * (jb - 1):, :]
+    Di, Vi = np.linalg.eig(A)
 
-        # Singular Value decomposition of projection Matrix
-        u, s, v_t = sv_decomp_ssi(p=p_i)
+    mu = np.log(Di) / dt  # poles
+    fn = np.abs(mu[1::2]) / (2 * np.pi)  # eigen-frequencies
+    zeta = -np.real(mu[1::2]) / np.abs(mu[1::2])  # modal damping ratio
+    phi = np.real(C @ Vi)  # mode shapes
+    phi = phi[:, 1::2]
 
-        for i in range(ord_min + d_ord, ord_max + 1, d_ord):
-            state = "     Order " + str(i) + "/" + str(ord_max)
-            print(state)
-            # Cut the results of the svd results according to the current order of the system
-            u1 = u[:br * n_ch, :i]
-            s1 = s[:i, :i]
-            # System Matrix and Output Matrix calculations
-            # Observability matrix
-            obs = u1 @ s1
-            # Split Matrix
-            o1 = obs[:obs.shape[0] - n_ch, :]
-            sp = np.linalg.pinv(obs) @ p_i  # kalman state sequence
-            sp1 = np.linalg.pinv(o1) @ p_i_1  # shifted kalman state sequence
-            ac = np.vstack((sp1, y_i)) @ np.linalg.pinv(sp)
-            # System matrix A
-            a_mat = ac[:sp1.shape[0]]
-            # Output Influence Matrix C
-            c_mat = ac[sp1.shape[0]:]
-            # The eigenvalues of the system matrix determine the natural frequencies and the damping
-            [mu, psi] = np.linalg.eig(a_mat)
-            var_lambda = np.log(mu) * fs
-            freqs.append(np.abs(var_lambda / 2 / np.pi))
-            zeta.append(np.abs(np.real(var_lambda)) / np.abs(var_lambda))
-            # The eigenvector together with the output matrix C determine the mode shapes
-            phi.append(c_mat @ psi)  # each column contains one mode shape
-    elif method == 'CovarianceDriven':
-        # Calculate Toeplitz-Matrix
-        tm = toeplitz(data=data,
-                      Ts=Ts,
-                      fs=fs)
-
-        # Singular Value decomposition of projection Matrix
-        u, s, v_t = sv_decomp_ssi(p=tm)
-
-        for i in range(ord_min + d_ord, ord_max + 1, d_ord):
-            state = "     Order " + str(i) + "/" + str(ord_max)
-            print(state)
-            # Cut the results of the svd results according to the current order of the system
-            u1 = u[:br * n_ch, :i]
-            s1 = s[:i, :i]
-            # System Matrix and Output Matrix calculations
-            # Observability matrix
-            obs = u1 @ s1
-            # Split Matrix
-            o1 = obs[:obs.shape[0] - n_ch, :]
-            o2 = obs[n_ch:, :]
-            # System matrix A
-            a_mat = np.linalg.pinv(o1) @ o2
-            # Output Influence Matrix C
-            c_mat = obs[:n_ch, :]
-            # The eigenvalues of the system matrix determine the natural frequencies and the damping
-            [mu, psi] = np.linalg.eig(a_mat)
-            var_lambda = np.log(mu) * fs
-            freqs.append(np.abs(var_lambda / 2 / np.pi))
-            zeta.append(np.abs(np.real(var_lambda)) / np.abs(var_lambda))
-            # The eigenvector together with the output matrix C determine the mode shapes
-            phi.append(c_mat @ psi)  # each column contains one mode shape
-    # Return modal parameters
-    print("Stochastic Subspace Identification complete...")
-    return freqs, zeta, phi, a_mat, c_mat
+    return fn, zeta, phi
 
 
-def stabilization_calc(freqs, zeta, modes, limits):
-    # stable modal parameters
-    freqs_stable_in_f = []
-    zeta_stable_in_f = []
-    modes_stable_in_f = []
-    order_stable_in_f = []
-    freqs_stable_in_f_d = []
-    zeta_stable_in_f_d = []
-    modes_stable_in_f_d = []
-    order_stable_in_f_d = []
-    freqs_stable_in_f_d_m = []
-    zeta_stable_in_f_d_m = []
-    modes_stable_in_f_d_m = []
-    order_stable_in_f_d_m = []
-    for i in range(len(freqs)):
-        for j in range(len(freqs[i])):
-            if i > 0:
-                # Find the closest frequency to current one
-                pole_idx = np.argmin(np.abs(freqs[i][j] - freqs[i - 1]))
-                f_old = freqs[i - 1][pole_idx]
-                f_cur = freqs[i][j]
-                # same for damping and modes
-                z_old = zeta[i - 1][pole_idx]
-                z_cur = zeta[i][j]
-                m_old = modes[i - 1][:, pole_idx]
-                m_cur = modes[i][:, j]
+def stabilityCheck(fn0, zeta0, phi0, fn1, zeta1, phi1, eps_freq, eps_zeta, eps_MAC):
+    fn, zeta, phi, MAC, stability_status = [], [], [], [], []
 
-                # Store frequencies fulfilling certain conditions in separate Lists
-                # stable in frequency, damping and mode shape
-                if np.abs(f_old - f_cur) / f_cur <= limits[0] and \
-                        np.abs(z_old - z_cur) / z_cur <= limits[1] and \
-                        mac_calc(m_old, m_cur) >= (1-limits[2]) and \
-                        z_cur < limits[3]:
-                    freqs_stable_in_f_d_m.append(f_cur)
-                    zeta_stable_in_f_d_m.append(z_cur)
-                    modes_stable_in_f_d_m.append(m_cur)
-                    order_stable_in_f_d_m.append(i)
-                # stable in frequency and damping
-                elif np.abs(f_old - f_cur) / f_cur <= limits[0] and \
-                        np.abs(z_old - z_cur) / z_cur <= limits[1] and \
-                        z_cur < limits[3]:
-                    freqs_stable_in_f_d.append(f_cur)
-                    zeta_stable_in_f_d.append(z_cur)
-                    modes_stable_in_f_d.append(m_cur)
-                    order_stable_in_f_d.append(i)
-                # stable in frequency:
-                elif np.abs(f_old - f_cur) / f_cur <= limits[0] and \
-                        z_cur < limits[3]:
-                    freqs_stable_in_f.append(f_cur)
-                    zeta_stable_in_f.append(z_cur)
-                    modes_stable_in_f.append(m_cur)
-                    order_stable_in_f.append(i)
+    for rr in range(len(fn0)):
+        for jj in range(len(fn1)):
+            stab_fn = errCheck(fn0[rr], fn1[jj], eps_freq)
+            stab_zeta = errCheck(zeta0[rr], zeta1[jj], eps_zeta)
+            stab_phi, dummyMAC = getMAC(phi0[:, rr], phi1[:, jj], eps_MAC)
 
-    freqs_out = [freqs_stable_in_f_d_m, freqs_stable_in_f_d, freqs_stable_in_f]
-    zeta_out = [zeta_stable_in_f_d_m, zeta_stable_in_f_d, zeta_stable_in_f]
-    modes_out = [modes_stable_in_f_d_m, modes_stable_in_f_d, modes_stable_in_f]
-    order_out = [order_stable_in_f_d_m, order_stable_in_f_d, order_stable_in_f]
+            if stab_fn == 0:
+                stabStatus = 0
+            elif stab_fn == 1 and stab_phi == 1 and stab_zeta == 1:
+                stabStatus = 1
+            elif stab_fn == 1 and stab_zeta == 0 and stab_phi == 1:
+                stabStatus = 2
+            elif stab_fn == 1 and stab_zeta == 1 and stab_phi == 0:
+                stabStatus = 3
+            elif stab_fn == 1 and stab_zeta == 0 and stab_phi == 0:
+                stabStatus = 4
+            else:
+                raise ValueError('Error: stability_status is undefined')
 
-    return freqs_out, zeta_out, modes_out, order_out
+            fn.append(fn1[jj])
+            zeta.append(zeta1[jj])
+            phi.append(phi1[:, jj])
+            MAC.append(dummyMAC)
+            stability_status.append(stabStatus)
+
+    indsort = np.argsort(fn)
+    fn = np.array(fn)[indsort]
+    zeta = np.array(zeta)[indsort]
+    phi = np.array(phi)[indsort, :]
+    MAC = np.array(MAC)[indsort]
+    stability_status = np.array(stability_status)[indsort]
+
+    return fn, zeta, phi, MAC, stability_status
 
 
-def stabilization_diag(freqs, order, cutoff, plot='FDM'):
+def getMAC(phi1, phi2, eps_MAC):
+    if phi1.shape[0] != phi2.shape[0]:
+        raise ValueError('The mode shapes must have the same number of DOFs')
+
+    MAC = (np.abs(np.conj(phi1).T @ phi2) ** 2) / ((np.conj(phi1).T @ phi1) * (np.conj(phi2).T @ phi2))
+    stabMAC = errCheck(MAC, 1, eps_MAC)
+
+    return stabMAC, MAC
+
+
+def errCheck(x1, x2, eps):
+    return int(np.abs((x1 - x2) / x1) < eps)
+
+
+def getStablePoles(fn2, zeta2, phi2, MAC, stability_status):
+    fnS, zetaS, phiS, MACS = [], [], [], []
+
+    for oo in range(len(stability_status)):
+        ind = (stability_status[oo] == 1) | (stability_status[oo] == 2)
+        fnS.extend(fn2[oo][ind])
+        zetaS.extend(zeta2[oo][ind])
+        phiS.append(phi2[oo][:, ind])
+        MACS.append(MAC[oo][ind])
+
+    return fnS, zetaS, phiS, MACS
+
+
+'''SSI-COV-Function -> Covariance Driven Stochastic Subspace ID'''
+
+
+def SSICOV(y, dt, Ts, ord_min, ord_max, limits):
+    # Get dimensions
+    n_dat, n_ch = y.shape
+
+    # Construct Toeplitz Matrix
+    toep = toeplitz(data=y,
+                    fs=1 / dt,
+                    Ts=Ts)
+
+    # Singular Value Decomposition of Teoplitz Matrix
+    U, S, _ = sv_decomp_ssi(toep)
+
+    # Iterate over all orders in descending fashion
+    j = 1  # ascending iterator
+    ord_cur = ord_max  # current order to store for stabilazation diagram
+    # Initialize values to store
+    fn2, zeta2, phi2, MAC, stability_status, order = [], [], [], [], [], []
+    for i in range(ord_max, ord_min - 1, -1):
+        if j == 1:
+            fn0, zeta0, phi0 = modalID(U, S, i, n_ch, dt)
+        else:
+            fn1, zeta1, phi1 = modalID(U, S, i, n_ch, dt)
+            a, b, c, d, e = stabilityCheck(fn0=fn0,
+                                           zeta0=zeta0,
+                                           phi0=phi0,
+                                           fn1=fn1,
+                                           zeta1=zeta1,
+                                           phi1=phi1,
+                                           eps_freq=limits[0],
+                                           eps_zeta=limits[1],
+                                           eps_MAC=limits[2])
+            fn2.append(a)
+            zeta2.append(b)
+            phi2.append(c)
+            MAC.append(d)
+            stability_status.append(e)
+            fn0, zeta0, phi0 = fn1, zeta1, phi1
+        order.append(ord_cur)
+        ord_cur -= 1
+        j += 1
+
+    stability_status = list(reversed(stability_status))
+    fn2 = list(reversed(fn2))
+    zeta2 = list(reversed(zeta2))
+    phi2 = list(reversed(phi2))
+    MAC = list(reversed(MAC))
+    order = list(reversed(order))
+
+    return fn2, zeta2, phi2, order, MAC, stability_status
+
+
+def stabilization_diag(freqs, order, label, cutoff):
     # Create a figure and axis object
     fig, ax = plt.subplots()
-
-    handles = []
-    if plot == 'FDM':
-        for i, f in enumerate(freqs[0]):
-            ax.scatter(f, [order[0][i]], marker='x', c='black')
-        # Manually add a legend
-        point0 = plt.Line2D([0], [0],
-                            label='Stable in Frequency, Damping and Mode Shape',
-                            marker='x',
-                            color='black',
-                            linestyle='')
-        handles = [point0]
-    elif plot == 'all':
-        for i, f in enumerate(freqs[0]):
-            ax.scatter(f, [order[0][i]], marker='x', c='black')
-        # Manually add a legend
-        point0 = plt.Line2D([0], [0],
-                            label='Stable in Frequency, Damping and Mode Shape',
-                            marker='x',
-                            color='black',
-                            linestyle='')
-        for i, f in enumerate(freqs[1]):
-            ax.scatter(f, [order[1][i]], marker='o', c='black', alpha=0.6)
-        # Manually add a legend
-        point1 = plt.Line2D([0], [0],
-                            label='Stable in Frequency and Damping',
-                            marker='o',
-                            color='black',
-                            alpha=0.6,
-                            linestyle='')
-        for i, f in enumerate(freqs[2]):
-            ax.scatter(f, [order[2][i]], marker='.', c='black', alpha=0.3)
-        # Manually add a legend
-        point2 = plt.Line2D([0], [0],
-                            label='Stable in Frequency',
-                            marker='.',
-                            color='black',
-                            alpha=0.3,
-                            linestyle='')
-        handles = [point0, point1, point2]
-
+    for i, f in enumerate(freqs):
+        if label == 1:
+            ax.scatter(f, order[i], marker='x', c='black')
+        elif label == 2:
+            ax.scatter(f, order[i], marker='o', c='black', alpha=0.6)
+        elif label == 3:
+            ax.scatter(f, order[i], marker='.', c='black', alpha=0.3)
+        elif label == 4:
+            ax.scatter(f, order[i], marker='.', c='grey', alpha=0)
+    # Manually add a legend
+    point0 = plt.Line2D([0], [0],
+                        label='Stable in Frequency, Damping and Mode Shape',
+                        marker='x',
+                        color='black',
+                        linestyle='')
+    point1 = plt.Line2D([0], [0],
+                        label='Stable in Frequency and Damping',
+                        marker='o',
+                        color='black',
+                        alpha=0.6,
+                        linestyle='')
+    point2 = plt.Line2D([0], [0],
+                        label='Stable in Frequency',
+                        marker='.',
+                        color='black',
+                        alpha=0.3,
+                        linestyle='')
+    point3 = plt.Line2D([0], [0],
+                        label='New Pole',
+                        marker='.',
+                        color='black',
+                        alpha=0,
+                        linestyle='')
+    handles = [point0, point1, point2, point3]
     ax.set_xlim([0, cutoff])
     ax.set_xlabel("f (Hz)")
     ax.set_ylabel("Model Order")

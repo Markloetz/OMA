@@ -58,7 +58,7 @@ if __name__ == '__main__':
                              detrend=True,
                              cutoff=cutoff*2,
                              downsample=False)
-
+    '''
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc,
                                     fs=Fs,
@@ -69,7 +69,10 @@ if __name__ == '__main__':
 
     # SVD of CPSD-matrix @ each frequency
     S, U, S2, U2 = oma.fdd.sv_decomp(mCPSD)
-
+    '''
+    vf = np.linspace(0, cutoff, 1000)
+    S = vf
+    S2 = vf
     # SSI
     # Perform SSI algorithm
     data, _ = oma.import_data("Data/TiflisBruecke2/Data_190624_pos_r1_09_10_r2.mat",
@@ -85,7 +88,7 @@ if __name__ == '__main__':
                                                 ord_max=ord_max,
                                                 d_ord=d_ord,
                                                 method='CovarianceDriven',
-                                                Ts=0.8)
+                                                Ts=0.1)
 
     # Calculate stable poles
     freqs_stable, zeta_stable, modes_stable, order_stable = oma.ssi.stabilization_calc(freqs, zeta, modes, limits)
@@ -101,7 +104,6 @@ if __name__ == '__main__':
     # fPeaks, Peaks, nPeaks = oma.fdd.peak_picking(vf, 20 * np.log10(S), 20 * np.log10(S2), n_sval=1, cutoff=cutoff)
 
     '''Extract modal damping by averaging over the damping values of each dataset'''
-
     wn_fdd, zeta_fdd, PHI_fdd = oma.modal_extract(path=path,
                                                   Fs=Fs,
                                                   n_rov=n_rov,

@@ -10,10 +10,10 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Path of Measurement Files and other specifications
-    path = "Data/TiflisBruecke2/"
+    path = "Data/TiflisBruecke/"
     n_rov = 2
-    n_ref = 2
-    ref_channel = [0, 3]
+    n_ref = 1
+    ref_channel = 0 #[0, 3]
     rov_channel = [1, 2]
     ref_position = [0, 0]
 
@@ -21,7 +21,7 @@ if __name__ == '__main__':
     cutoff = 25
 
     # measurement duration
-    t_end = 1000
+    t_end = 500
 
     # Threshold for MAC
     mac_threshold = 0.99
@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 50
+    n_seg = 25
     overlap = 0.5
     zero_padding = False
 
