@@ -428,11 +428,8 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
             # add scaling factor of 1 (none) at the positions of the reference sensors
             alpha = np.insert(alpha, pos - 1, np.ones(nPeaks), axis=0)
 
-    print(phi_not_scaled)
-    print(alpha.T)
     phi_out = phi_not_scaled * alpha.T
-    print(phi_out)
-    return fn_out, zeta_out, phi_out
+    return fn_out, zeta_out, phi_not_scaled
 
 
 def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=True):
@@ -570,3 +567,46 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
     print("Saving Animation...")
     ani.save(filename, writer='pillow')
     print(f"Animation saved to {filename}!")
+
+
+def compute_mac_mat(phi):
+    """
+    Compute the Modal Assurance Criterion (MAC) matrix.
+
+    Parameters:
+    phi (numpy.ndarray): Mode shape matrix where each column is a mode shape vector.
+
+    Returns:
+    numpy.ndarray: MAC matrix.
+    """
+    num_modes = phi.shape[1]
+    mac = np.zeros((num_modes, num_modes))
+
+    for i in range(num_modes):
+        for j in range(num_modes):
+            num = np.abs(np.dot(phi[:, i].conj().T, phi[:, j])) ** 2
+            denom = np.dot(phi[:, i].conj().T, phi[:, i]) * np.dot(phi[:, j].conj().T, phi[:, j])
+            mac[i, j] = num / denom
+
+    return mac
+
+
+def plot_mac_matrix(phi, title='MAC Matrix'):
+    """
+    Plot the MAC matrix.
+
+    Parameters:
+    phi (numpy.ndarray): Mode shape matrix where each column is a mode shape vector.
+    title (str): Title of the plot.
+    """
+    mac = compute_mac_mat(phi)
+
+    fig, ax = plt.subplots()
+    cax = ax.matshow(mac, cmap='viridis')
+    fig.colorbar(cax)
+
+    plt.title(title)
+    plt.xlabel('Mode Shape Index')
+    plt.ylabel('Mode Shape Index')
+
+    plt.show()

@@ -27,7 +27,7 @@ if __name__ == '__main__':
     # Specify limits
     f_lim = 0.01  # Pole stability (frequency)
     z_lim = 0.04  # Pole stability (damping)
-    mac_lim = 0.05  # Mode stability (MAC-Value)
+    mac_lim = 0.15  # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
 
     # block-rows
@@ -92,7 +92,7 @@ if __name__ == '__main__':
               [13.25 - 0.5, 13.25 + 0.5],
               [16.9 - 0.5, 16.9 + 0.5]]
     nPeaks = len(ranges)
-    fS, zetaS, _ = oma.ssi.ssi_extract(freqs, zeta, modes, status, ranges)
+    fS, zetaS, modeS1 = oma.ssi.ssi_extract(freqs, zeta, modes, status, ranges)
 
     # Print Damping and natural frequencies
     print("Natural Frequencies [Hz]:")
@@ -118,6 +118,8 @@ if __name__ == '__main__':
                                              mode_extract=True,
                                              cutoff=cutoff,
                                              Ts=0.8)
+
+    # oma.plot_mac_matrix(np.array([modeS, modeS1]), title="MAC-Matrix between Individual ID and Complete ID")
 
     # 2d-Plot mode shapes
     for i in range(nPeaks):

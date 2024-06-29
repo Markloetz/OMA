@@ -271,39 +271,47 @@ def stabilization_diag(freqs, label, cutoff):
     fig, ax = plt.subplots()
     for order in range(len(freqs)):
         for i, f in enumerate(freqs[order]):
-            if label[order][i] == 1:
+            if label[order][i] == 4:
                 ax.scatter(f, order, marker='x', c='black')
-            elif label[order][i] == 2:
-                ax.scatter(f, order, marker='o', c='black', alpha=0.6)
             elif label[order][i] == 3:
-                ax.scatter(f, order, marker='.', c='black', alpha=0.3)
-            elif label[order][i] == 4:
-                ax.scatter(f, order, marker='.', c='grey', alpha=0)
+                ax.scatter(f, order, marker='o', c='black', alpha=0.6)
+            elif label[order][i] == 2:
+                ax.scatter(f, order, marker='s', c='black', alpha=0.6)
+            elif label[order][i] == 1:
+                ax.scatter(f, order, marker='.', c='grey', alpha=0.6)
+            else:
+                ax.scatter(f, order, marker='.', c='grey', alpha=0.3)
     # Manually add a legend
-    point0 = plt.Line2D([0], [0],
-                        label='Stable in Frequency, Damping and Mode Shape',
+    point4 = plt.Line2D([0], [0],
+                        label='Stable in Frequency',
                         marker='x',
                         color='black',
                         linestyle='')
-    point1 = plt.Line2D([0], [0],
+    point3 = plt.Line2D([0], [0],
                         label='Stable in Frequency and Damping',
                         marker='o',
                         color='black',
                         alpha=0.6,
                         linestyle='')
     point2 = plt.Line2D([0], [0],
-                        label='Stable in Frequency',
+                        label='Stable in Frequency and Mode Shape',
+                        marker='s',
+                        color='black',
+                        alpha=0.6,
+                        linestyle='')
+    point1 = plt.Line2D([0], [0],
+                        label='Stable Pole',
                         marker='.',
                         color='black',
                         alpha=0.6,
                         linestyle='')
-    point3 = plt.Line2D([0], [0],
+    point0 = plt.Line2D([0], [0],
                         label='New Pole',
                         marker='.',
                         color='black',
                         alpha=0.3,
                         linestyle='')
-    handles = [point0, point1, point2, point3]
+    handles = [point0, point1, point2, point3, point4]
     ax.set_xlim([0, cutoff])
     ax.set_xlabel("f (Hz)")
     ax.set_ylabel("Model Order")
