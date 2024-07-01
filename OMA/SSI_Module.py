@@ -141,7 +141,7 @@ def modalID(U, S, Nmodes, Nyy, dt):
     mu = np.log(Di) / dt  # poles
     fn = np.abs(mu[1::2]) / (2 * np.pi)  # eigen-frequencies
     zeta = -np.real(mu[1::2]) / np.abs(mu[1::2])  # modal damping ratio
-    phi = np.real(C @ Vi)  # mode shapes
+    phi = C @ Vi  # mode shapes
     phi = phi[:, 1::2]
 
     return fn, zeta, phi
@@ -266,6 +266,20 @@ def SSICOV(y, dt, Ts, ord_min, ord_max, limits):
     return fn2, zeta2, phi2, order, MAC, stability_status
 
 
+'''Additional Functions'''
+
+
+def mode_avg(mode_list):
+    # align modes
+    for i in range(len(mode_list)):
+        if mode_list[i][0].real < 0:
+            mode_list[i] = mode_list[i]*-1
+    # convert to np array
+    mode_arr = np.array(mode_list)
+    mode_avg = np.mean(mode_arr, axis=0)
+    return mode_avg
+
+
 def stabilization_diag(freqs, label, cutoff):
     # Create a figure and axis object
     fig, ax = plt.subplots()
@@ -316,6 +330,32 @@ def stabilization_diag(freqs, label, cutoff):
     return fig, ax
 
 
+def get_mode_shapes(mode_list):
+    # align modes
+    mode_list_new = []
+    for i in range(len(mode_list)):
+        if mode_list[i][0].real < 0:
+            mode_list_new.append(mode_list[i]*-1)
+    n_poles = len(mode_list_new)
+    # create AutoMAC-Matrix
+    AutoMAC = np.zeros((n_poles, n_poles), dtype=complex)  # initialization
+    # Looping throug the extracted poles to calculate the autoMAC
+    # matrix (between the poles)
+    for b in range(n_poles):    # first loop
+        phi1 = mode_list_new[b]     # shape 1
+        for k in range(n_poles):    # secondo loop
+            phi2 = mode_list_new[k]     # shape 1
+
+            AutoMAC[b, k] = mac_calc(phi1, phi2)  # MaC between every pole
+
+    # I look for the pole that have the highest sum of macs
+    print(AutoMAC)
+    SAmaC = np.sum(AutoMAC, axis=1)  # adding up every value on a column
+    idxmax = np.argmax(SAmaC)
+    # Normalize Mode
+    idmax = np.argmax(abs(mode_list_new[idxmax]))
+    return mode_list_new[idxmax] / mode_list_new[idxmax][idmax]  # normalised (unity displacement)
+
 def ssi_extract(freqs, zeta, modes, label, ranges):
     # Initialize Output Arrays
     freqs_out = []
@@ -324,7 +364,6 @@ def ssi_extract(freqs, zeta, modes, label, ranges):
     f_avg = 0
     z_avg = 0
     m_avg = 0
-    mode_len = max(modes, key=lambda x: x.size).shape
     for j, _range in enumerate(ranges):
         f_to_avg = []
         z_to_avg = []
@@ -336,16 +375,14 @@ def ssi_extract(freqs, zeta, modes, label, ranges):
                 if label[order][i] == 1:
                     if _range[0] <= f <= _range[1]:
                         f_to_avg.append(f)
-                        z_to_avg.append(zeta[order][i])
-                        if len(m_to_avg) == 0:
-                            m_to_avg.append(modes[order][i])
+                        if 0 < zeta[order][i] < 0.1:
+                            z_to_avg.append(zeta[order][i])
+                # if label[order][i] == 2:        # label[order][i] == 1 or
+                #     if _range[0] <= f <= _range[1]:
+                        m_to_avg.append(modes[order][i])
         f_avg = np.mean(f_to_avg)
         z_avg = np.mean(z_to_avg)
-        if not m_to_avg:
-            m_to_avg_arr = np.zeros(mode_len)
-        else:
-            m_to_avg_arr = np.array(m_to_avg)
-        m_avg = np.mean(m_to_avg_arr, axis=0)
+        m_avg = get_mode_shapes(m_to_avg)
         freqs_out.append(f_avg)
         zeta_out.append(z_avg)
         modes_out.append(m_avg)
