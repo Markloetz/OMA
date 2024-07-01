@@ -11,10 +11,10 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Path of Measurement Files and other specifications
-    path = "Data/TiflisBruecke/"
+    path = "Data/TiflisBruecke2/"
     n_rov = 2
-    n_ref = 1
-    ref_channel = 0
+    n_ref = 2
+    ref_channel = [0, 3]
     rov_channel = [1, 2]
     ref_position = [0, 0]
 
@@ -22,14 +22,14 @@ if __name__ == '__main__':
     cutoff = 25
 
     # measurement duration
-    t_end = 500
+    t_end = 1000
 
     # Threshold for MAC
     mac_threshold = 0.99
 
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 25
+    n_seg = 50
     overlap = 0.5
     zero_padding = False
 
@@ -72,9 +72,9 @@ if __name__ == '__main__':
 
     ''' Perform SSI '''
     # Reload mat files with stored lists
-    with open('freqs.pkl', 'rb') as f:
+    with open('freqs2.pkl', 'rb') as f:
         freqs = pickle.load(f)
-    with open('status.pkl', 'rb') as f:
+    with open('status2.pkl', 'rb') as f:
         status = pickle.load(f)
 
     fPeaks, Peaks, nPeaks = oma.ssi.peak_picking_ssi(x=vf,

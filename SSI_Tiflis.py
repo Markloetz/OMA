@@ -19,21 +19,21 @@ if __name__ == '__main__':
     ref_position = [0, 0]
 
     # Cutoff frequency (band of interest)
-    cutoff = 25
+    cutoff = 50
 
     # measurement duration
     t_end = 500
 
     # SSI-Parameters
-    f_lim = 0.01        # Pole stability (frequency)
-    z_lim = 0.02        # Pole stability (damping)
-    mac_lim = 0.01      # Mode stability (MAC-Value)
+    f_lim = 0.02        # Pole stability (frequency)
+    z_lim = 0.05        # Pole stability (damping)
+    mac_lim = 0.02      # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
     ord_min = 0
     ord_max = 60
 
     '''Extract modal damping by averaging over the damping values of each dataset'''
-    fPeaks = [1.85289026, 6.35917479, 7.09403202, 13.30545188, 16.94966666]
+    fPeaks = [1.85, 6.36, 7.09, 13.30, 16.95]
     nPeaks = len(fPeaks)
     wn, zeta, PHI = oma.modal_extract_ssi(path=path,
                                           Fs=Fs,

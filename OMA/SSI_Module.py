@@ -269,17 +269,6 @@ def SSICOV(y, dt, Ts, ord_min, ord_max, limits):
 '''Additional Functions'''
 
 
-def mode_avg(mode_list):
-    # align modes
-    for i in range(len(mode_list)):
-        if mode_list[i][0].real < 0:
-            mode_list[i] = mode_list[i]*-1
-    # convert to np array
-    mode_arr = np.array(mode_list)
-    mode_avg = np.mean(mode_arr, axis=0)
-    return mode_avg
-
-
 def stabilization_diag(freqs, label, cutoff):
     # Create a figure and axis object
     fig, ax = plt.subplots()
@@ -330,31 +319,38 @@ def stabilization_diag(freqs, label, cutoff):
     return fig, ax
 
 
-def get_mode_shapes(mode_list):
+def get_mode_shapes(mode_list, n_ch):
     # align modes
     mode_list_new = []
-    for i in range(len(mode_list)):
-        if mode_list[i][0].real < 0:
-            mode_list_new.append(mode_list[i]*-1)
-    n_poles = len(mode_list_new)
-    # create AutoMAC-Matrix
-    AutoMAC = np.zeros((n_poles, n_poles), dtype=complex)  # initialization
-    # Looping throug the extracted poles to calculate the autoMAC
-    # matrix (between the poles)
-    for b in range(n_poles):    # first loop
-        phi1 = mode_list_new[b]     # shape 1
-        for k in range(n_poles):    # secondo loop
-            phi2 = mode_list_new[k]     # shape 1
+    if len(mode_list) > 1:
+        for i in range(len(mode_list)):
+            if mode_list[i][0].real < 0:
+                mode_list_new.append(mode_list[i] * -1)
+        n_poles = len(mode_list_new)
+        # create AutoMAC-Matrix
+        AutoMAC = np.zeros((n_poles, n_poles), dtype=complex)  # initialization
+        # Looping through the extracted poles to calculate the autoMAC
+        # matrix (between the poles)
+        for b in range(n_poles):  # first loop
+            phi1 = mode_list_new[b]  # shape 1
+            for k in range(n_poles):  # secondo loop
+                phi2 = mode_list_new[k]  # shape 1
 
-            AutoMAC[b, k] = mac_calc(phi1, phi2)  # MaC between every pole
+                AutoMAC[b, k] = mac_calc(phi1, phi2)  # MaC between every pole
 
-    # I look for the pole that have the highest sum of macs
-    print(AutoMAC)
-    SAmaC = np.sum(AutoMAC, axis=1)  # adding up every value on a column
-    idxmax = np.argmax(SAmaC)
-    # Normalize Mode
-    idmax = np.argmax(abs(mode_list_new[idxmax]))
-    return mode_list_new[idxmax] / mode_list_new[idxmax][idmax]  # normalised (unity displacement)
+        # I look for the pole that have the highest sum of macs
+        SAmaC = np.sum(AutoMAC, axis=1)  # adding up every value on a column
+        idxmax = np.argmax(SAmaC)
+        # Normalize Mode
+        idmax = np.argmax(abs(mode_list_new[idxmax]))
+        return mode_list_new[idxmax] / mode_list_new[idxmax][idmax]  # normalised (unity displacement)
+    elif len(mode_list) == 1:
+        idmax = np.argmax(abs(mode_list[0]))
+        return mode_list[0] / mode_list[0][idmax]
+    else:
+        dummy_mode = np.zeros(n_ch)
+        return dummy_mode
+
 
 def ssi_extract(freqs, zeta, modes, label, ranges):
     # Initialize Output Arrays
@@ -364,6 +360,7 @@ def ssi_extract(freqs, zeta, modes, label, ranges):
     f_avg = 0
     z_avg = 0
     m_avg = 0
+    _, n_ch = max(modes, key=lambda x: x.size).shape
     for j, _range in enumerate(ranges):
         f_to_avg = []
         z_to_avg = []
@@ -377,12 +374,12 @@ def ssi_extract(freqs, zeta, modes, label, ranges):
                         f_to_avg.append(f)
                         if 0 < zeta[order][i] < 0.1:
                             z_to_avg.append(zeta[order][i])
-                # if label[order][i] == 2:        # label[order][i] == 1 or
-                #     if _range[0] <= f <= _range[1]:
+                        # if label[order][i] == 2:        # label[order][i] == 1 or
+                        #     if _range[0] <= f <= _range[1]:
                         m_to_avg.append(modes[order][i])
         f_avg = np.mean(f_to_avg)
         z_avg = np.mean(z_to_avg)
-        m_avg = get_mode_shapes(m_to_avg)
+        m_avg = get_mode_shapes(m_to_avg, n_ch)
         freqs_out.append(f_avg)
         zeta_out.append(z_avg)
         modes_out.append(m_avg)

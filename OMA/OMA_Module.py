@@ -345,7 +345,7 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
     # Frequency Ranges for the SSI_EXTRACT to average
     f_rel = []
     for j in range(nPeaks):
-        f_rel.append([fPeaks[j] - 0.3, fPeaks[j] + 0.3])
+        f_rel.append([fPeaks[j] - 0.5, fPeaks[j] + 0.5])
 
     # Import Data and do EFDD procedure for each dataset
     for i, filename in enumerate(glob.glob(os.path.join(path, '*.mat'))):
@@ -372,7 +372,6 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
         zetan[i, :] = zeta_extract
         for j in range(nPeaks):
             mode_curr = np.array(modes_extract[j])
-            print(mode_curr)
             ref_modes[i, j] = mode_curr[ref_channel]
             rov_modes[i, j] = mode_curr[rov_channel]
 
