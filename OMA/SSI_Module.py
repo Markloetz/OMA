@@ -11,7 +11,7 @@ class SliderValClass:
 '''Functions needed by the SSI_COV'''
 
 
-def NExT(x, dt, Ts, method=2):
+def NExT(x, dt, Ts, method=1):
     if len(x.shape) == 1:
         x = x[np.newaxis, :]  # Convert to 2D array with a single row if x is a 1D array
 
@@ -178,7 +178,7 @@ def stabilityCheck(fn0, zeta0, phi0, fn1, zeta1, phi1, eps_freq, eps_zeta, eps_M
     indsort = np.argsort(fn)
     fn = np.array(fn)[indsort]
     zeta = np.array(zeta)[indsort]
-    phi = np.array(phi)[indsort, :]
+    phi = np.array(phi)[indsort]
     MAC = np.array(MAC)[indsort]
     stability_status = np.array(stability_status)[indsort]
 
@@ -271,16 +271,15 @@ def stabilization_diag(freqs, label, cutoff):
     fig, ax = plt.subplots()
     for order in range(len(freqs)):
         for i, f in enumerate(freqs[order]):
-            if label[order][i] == 4:
-                ax.scatter(f, order, marker='x', c='black')
-            elif label[order][i] == 3:
-                ax.scatter(f, order, marker='o', c='black', alpha=0.6)
-            elif label[order][i] == 2:
-                ax.scatter(f, order, marker='s', c='black', alpha=0.6)
-            elif label[order][i] == 1:
+            if label[order][i] == 1:
                 ax.scatter(f, order, marker='.', c='grey', alpha=0.6)
-            else:
-                ax.scatter(f, order, marker='.', c='grey', alpha=0.3)
+            # elif label[order][i] == 2:
+            #     ax.scatter(f, order, marker='s', c='black', alpha=0.6)
+            # elif label[order][i] == 3:
+            #     ax.scatter(f, order, marker='o', c='black', alpha=0.6)
+            # elif label[order][i] == 4:
+            #     ax.scatter(f, order, marker='x', c='black')
+
     # Manually add a legend
     point4 = plt.Line2D([0], [0],
                         label='Stable in Frequency',
@@ -305,18 +304,13 @@ def stabilization_diag(freqs, label, cutoff):
                         color='black',
                         alpha=0.6,
                         linestyle='')
-    point0 = plt.Line2D([0], [0],
-                        label='New Pole',
-                        marker='.',
-                        color='black',
-                        alpha=0.3,
-                        linestyle='')
-    handles = [point0, point1, point2, point3, point4]
+
+    handles = [point1, point2, point3, point4]
     ax.set_xlim([0, cutoff])
     ax.set_xlabel("f (Hz)")
     ax.set_ylabel("Model Order")
     ax.grid(visible=True, which='both')
-    ax.legend(handles=handles)
+    # ax.legend(handles=handles)
 
     # Return the axis object
     return fig, ax
@@ -330,6 +324,7 @@ def ssi_extract(freqs, zeta, modes, label, ranges):
     f_avg = 0
     z_avg = 0
     m_avg = 0
+    mode_len = max(modes, key=lambda x: x.size).shape
     for j, _range in enumerate(ranges):
         f_to_avg = []
         z_to_avg = []
@@ -342,10 +337,14 @@ def ssi_extract(freqs, zeta, modes, label, ranges):
                     if _range[0] <= f <= _range[1]:
                         f_to_avg.append(f)
                         z_to_avg.append(zeta[order][i])
-                        m_to_avg.append(modes[order][i])
+                        if len(m_to_avg) == 0:
+                            m_to_avg.append(modes[order][i])
         f_avg = np.mean(f_to_avg)
         z_avg = np.mean(z_to_avg)
-        m_to_avg_arr = np.array(m_to_avg)
+        if not m_to_avg:
+            m_to_avg_arr = np.zeros(mode_len)
+        else:
+            m_to_avg_arr = np.array(m_to_avg)
         m_avg = np.mean(m_to_avg_arr, axis=0)
         freqs_out.append(f_avg)
         zeta_out.append(z_avg)
@@ -403,7 +402,7 @@ def prominence_adjust_ssi(x, y, freqs, label, cutoff):
     return SliderValClass.slider_val
 
 
-def peak_picking_ssi(x, y, freqs, label, cutoff=100, plot='all'):
+def peak_picking_ssi(x, y, freqs, label, cutoff=100):
     y = y.ravel()
     x = x.ravel()
 

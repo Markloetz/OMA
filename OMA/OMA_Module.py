@@ -271,9 +271,9 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
         for j in range(nPeaks):
             wn[i, j], zetan[i, j] = fdd.sdof_time_domain_fit(y=sSDOF[:, j],
                                                              f=vf,
-                                                             n_skip=0,
+                                                             n_skip=4,
                                                              n_peaks=30,
-                                                             plot=False)
+                                                             plot=plot)
 
     # Average damping and scaling over all datasets
     wn_out = np.mean(wn, axis=0)
@@ -317,7 +317,7 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
     for i in range(nPeaks):
         phi_not_scaled[i, :] = rov_modes[:, i, :].flatten()
 
-    if np.sum(ref_pos) > 0:
+    if np.sum(ref_pos) >= 1:
         for j, pos in enumerate(ref_pos):
             # add reference modes to the not yet scaled roving modes
             phi_not_scaled = np.insert(phi_not_scaled, pos - 1, ref_modes[0, :, j], axis=1)
@@ -330,7 +330,8 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
 
 
 def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos, t_meas, fPeaks, limits, ord_min, ord_max, d_ord,
-                      plot=False, mode_extract=False, cutoff=100, Ts=1):
+                      plot=False, cutoff=100, Ts=1):
+
     # Parameters
     nPeaks = len(fPeaks)
     n_files = len([name for name in os.listdir(path)])
@@ -376,20 +377,16 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
             rov_modes[i, j] = mode_curr[rov_channel]
 
         # stabilization diagram
-        fig, ax = ssi.stabilization_diag(freqs, status, cutoff)
-        for j in range(nPeaks):
-            ax.axvspan(f_rel[j][0], f_rel[j][1], color='red', alpha=0.3)
-        if not plot:
-            plt.close(fig)
-            del fig
-            del ax
-        else:
+        if plot:
+            fig, ax = ssi.stabilization_diag(freqs, status, cutoff)
+            for j in range(nPeaks):
+                ax.axvspan(f_rel[j][0], f_rel[j][1], color='red', alpha=0.3)
             plt.show()
         # End of Loop over Files .........................................................
 
     # Average damping and scaling over all datasets
-    fn_out = np.mean(fn, axis=0)
-    zeta_out = np.mean(zetan, axis=0)
+    fn_out = np.nanmean(fn, axis=0)
+    zeta_out = np.nanmean(zetan, axis=0)
 
     # Mode shape scaling .................................................................
     # decide which one of the reference sensors is used for the scaling
@@ -429,10 +426,10 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
             alpha = np.insert(alpha, pos - 1, np.ones(nPeaks), axis=0)
 
     phi_out = phi_not_scaled * alpha.T
-    return fn_out, zeta_out, phi_not_scaled
+    return fn_out, zeta_out, phi_out
 
 
-def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=True):
+def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, plot=True):
     # Create a custom symmetrical colormap
     def symmetrical_colormap(cmap):
         n = 128
@@ -462,6 +459,9 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
         ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
 
     # Pre-Animation Calculations (Initial Data)
+    if np.sum(mode_shape) == 0 or mode_shape.any() == np.nan:
+        mode_shape = np.zeros(mode_shape.shape)
+        mode_shape = mode_shape+1
     x_diff = np.max(N[:, 0]) - np.min(N[:, 0])
     y_diff = np.max(N[:, 1]) - np.min(N[:, 1])
     longest_dim = np.max([x_diff, y_diff])
@@ -530,7 +530,7 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
                             clip=False)
     myMap = symmetrical_colormap(cm.jet)
     ax = fig.add_subplot(111, projection='3d')
-    title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz ({round(zeta_n * 100, 2)}%)"
+    title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz (Zeta = {round(zeta_n * 100, 2)}%; MPC = {round(mpc * 100, 2)})"
     ax.set_title(title)
     ax.set_xlim(np.min(N[:, 0].real), np.max(N[:, 0].real))
     ax.set_ylim(np.min(N[:, 1].real), np.max(N[:, 1].real))
@@ -569,44 +569,78 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, directory, mode_nr, plot=Tr
     print(f"Animation saved to {filename}!")
 
 
-def compute_mac_mat(phi):
-    """
-    Compute the Modal Assurance Criterion (MAC) matrix.
+def mpc(phi_r, phi_i):
+    # Calculate S_xx, S_yy, and S_xy
+    S_xx = phi_r.T @ phi_r
+    S_yy = phi_i.T @ phi_i
+    S_xy = phi_r.T @ phi_i
 
-    Parameters:
-    phi (numpy.ndarray): Mode shape matrix where each column is a mode shape vector.
-
-    Returns:
-    numpy.ndarray: MAC matrix.
-    """
-    num_modes = phi.shape[1]
-    mac = np.zeros((num_modes, num_modes))
-
-    for i in range(num_modes):
-        for j in range(num_modes):
-            num = np.abs(np.dot(phi[:, i].conj().T, phi[:, j])) ** 2
-            denom = np.dot(phi[:, i].conj().T, phi[:, i]) * np.dot(phi[:, j].conj().T, phi[:, j])
-            mac[i, j] = num / denom
-
-    return mac
+    # Return the MPC
+    return ((S_xx - S_yy) ** 2 + 4 * S_xy ** 2) / ((S_xx + S_yy) ** 2)
 
 
-def plot_mac_matrix(phi, title='MAC Matrix'):
-    """
-    Plot the MAC matrix.
+def modal_coherence_plot(f, s, u, f_peaks, cutoff):
+    n_peaks = len(f_peaks)
+    n_data = len(f)
+    # Calculate U at peaks
+    _, m = u.shape
+    u_peaks = np.zeros((n_peaks, m), dtype=np.complex_)
+    for j in range(n_peaks):
+        u_peaks[j, :] = u[np.where(f == f_peaks[j]), :]
+    # Plot modal Coherence
+    fig, ax1 = plt.subplots()
+    ax1.set_title("Modal Coherence Indicator Plot")
+    ax1.set_xlim([0, cutoff])
+    for i in range(n_peaks):
+        if n_peaks > 1:
+            color = ((n_peaks - i) / n_peaks, (i + 1) / n_peaks, (n_peaks - i) / n_peaks, 1)
+        else:
+            color = (0, 0, 0, 1)
 
-    Parameters:
-    phi (numpy.ndarray): Mode shape matrix where each column is a mode shape vector.
-    title (str): Title of the plot.
-    """
-    mac = compute_mac_mat(phi)
+        d = np.zeros(n_data, dtype=np.complex_)
+        for j in range(n_data):
+            u_h = np.conj(u[j, :]).T
+            d[j] = u_h@u_peaks[i, :]
+        ax1.plot(f, d.real, color=color, label=f'ModalCoherenceIndicator for f_n = {round(f_peaks[i], 2)}')
 
-    fig, ax = plt.subplots()
-    cax = ax.matshow(mac, cmap='viridis')
-    fig.colorbar(cax)
-
-    plt.title(title)
-    plt.xlabel('Mode Shape Index')
-    plt.ylabel('Mode Shape Index')
+    # Overlay Singular Values Plot with second y-axis
+    ax1.legend()
+    ax2 = ax1.twinx()
+    ax2.plot(f, s, color='black')
 
     plt.show()
+
+
+def modal_filtering(y, f_peaks, u, f, fs):
+    # Mode shape Matrix
+    n_peaks = len(f_peaks)
+    _, m = u.shape
+    u_peaks = np.zeros((n_peaks, m), dtype=np.complex_)
+    for j in range(n_peaks):
+        u_peaks[j, :] = u[np.where(f == f_peaks[j]), :]
+
+    # Perform FFT of data
+    fft_output = np.fft.fft(y)
+    yf = fft_output[:(len(fft_output) // 2)]
+    f = np.fft.fftfreq(len(y), 1 / fs)
+    vf = f[:(len(f) // 2)]
+
+    # Calculate Modal Forces
+    y1 = np.zeros((len(vf), m))
+    for i in range(m):
+        y1[:, i] = yf[:,i]
+    q = np.zeros((y1.shape[0], n_peaks), dtype=np.complex_)
+    for i in range(len(vf)):
+        a_inv = np.linalg.pinv(u_peaks.T)
+        q[i, :] = a_inv@yf[i, :].T
+
+    # calculate output
+    # y2 = np.zeros(y1.shape, dtype=np.complex_)
+    # for i in range(len(vf)):
+    #     y2[i, :] = q[i, :]@u_peaks
+
+    # plot difference
+    # y_diff = yf-y2
+    plt.plot(vf, 20*np.log10(q))
+    plt.show()
+

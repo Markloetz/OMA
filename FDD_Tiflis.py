@@ -10,15 +10,15 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Path of Measurement Files and other specifications
-    path = "Data/TiflisBruecke2/"
+    path = "Data/TiflisBruecke/"
     n_rov = 2
-    n_ref = 2
-    ref_channel = [0, 3]
+    n_ref = 1
+    ref_channel = 0
     rov_channel = [1, 2]
     ref_position = [0, 0]
 
     # Cutoff frequency (band of interest)
-    cutoff = 25
+    cutoff = 20
 
     # measurement duration
     t_end = 500
@@ -31,7 +31,7 @@ if __name__ == '__main__':
 
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 100
+    n_seg = 50
     overlap = 0.5
     zero_padding = False
 
@@ -49,8 +49,6 @@ if __name__ == '__main__':
                              cutoff=cutoff,
                              downsample=False)
 
-    print(acc.shape)
-
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc,
                                     fs=Fs,
@@ -65,10 +63,17 @@ if __name__ == '__main__':
     # Eliminate harmonic frequency bands (cut out harmonic peaks and interpolate)
     if filt:
         f_harmonic = oma.fdd.harmonic_est(data=acc, delta_f=0.25, f_max=cutoff, fs=Fs, plot=True)
-        S = oma.fdd.eliminate_harmonic(vf, S, f_harmonic)
+        S = oma.fdd.eliminate_harmonic(vf, 20 * np.log10(S), f_harmonic[1:-1])
 
     # Peak-picking
     fPeaks, Peaks, nPeaks = oma.fdd.peak_picking(vf, 20 * np.log10(S), 20 * np.log10(S2), n_sval=1, cutoff=cutoff)
+
+    # Modal Coherence Indicator
+    oma.modal_coherence_plot(f=vf,
+                             s=20*np.log10(S),
+                             u=U,
+                             f_peaks=fPeaks,
+                             cutoff=cutoff)
 
     '''Extract modal damping by averaging over the damping values of each dataset'''
     # Scaling the mode shapes
@@ -85,13 +90,20 @@ if __name__ == '__main__':
                                       n_seg=n_seg,
                                       zeropadding=zero_padding,
                                       mac_threshold=mac_threshold,
-                                      plot=True)
+                                      plot=False)
+
+    # MPC-Calculations
+    MPC = []
+    for i in range(nPeaks):
+        MPC.append(oma.mpc(PHI[i, :].real, PHI[i, :].imag))
 
     # Print Damping and natural frequencies
     print("Natural Frequencies [Hz]:")
     print(wn / 2 / np.pi)
     print("Damping [%]:")
     print(zeta * 100)
+    print("Modal Phase Collinearity:")
+    print(MPC)
 
     # additional step in mode shape scaling
     # PHI = oma.mode_shape_normalize(PHI, [0, 1], 2)
@@ -119,6 +131,7 @@ if __name__ == '__main__':
                               mode_shape=mode,
                               f_n=wn[i] / 2 / np.pi,
                               zeta_n=zeta[i],
-                              directory="Animations/Tiflis_2/",
+                              mpc=MPC[i],
+                              directory="Animations/Tiflis_1/",
                               mode_nr=i,
                               plot=True)

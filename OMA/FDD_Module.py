@@ -76,14 +76,15 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
             # calculate kurtosis
             kurtosis[i] = scipy.stats.kurtosis(data_filt, fisher=True)
         kurtosis_mean[j] = np.mean(kurtosis)
+        print(f"Filter at {j * delta_f} Hz")
 
     # find platykurtic frequencies and sort them
     idx_bad = []
     # detrend kurtosis
-    kurtosis_mean = scipy.signal.detrend(kurtosis_mean, type='linear')
+    # kurtosis_mean = scipy.signal.detrend(kurtosis_mean, type='linear')
     kurtosis_mean = kurtosis_mean - np.mean(kurtosis_mean)
     for i in range(1, kurtosis_mean.shape[0]):
-        if kurtosis_mean[i] <= np.min(kurtosis_mean) / 3:
+        if kurtosis_mean[i] <= np.min(kurtosis_mean) / 2.1:
             idx_bad.append(i)
 
     # Store indices of "harmonic groups" in array
@@ -98,6 +99,7 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
     if plot:
         fig, ax = plt.subplots()
         ax.set_ylim([-np.max(np.abs(kurtosis_mean)) * 1.5, np.max(np.abs(kurtosis_mean)) * 1.5])
+        ax.set_xlim([0, f_max])
         ax.plot(f_axis, kurtosis_mean)
         for i in range(len(harmonic_f)):
             if isinstance(harmonic_f[i], np.ndarray):
@@ -113,15 +115,19 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
 def eliminate_harmonic(f, s, f_range, cutoff=100):
     figure, ax = plt.subplots()
     ax.set_xlim([0, cutoff])
-    ax.set_ylim([-np.max(np.abs(20 * np.log10(s))) * 1.1, np.max(20 * np.log10(s)) * 0.9])
     ax.set_xlabel('f (Hz)')
     ax.set_ylabel('Singular Values (dB)')
-    ax.plot(f, 20 * np.log10(s))
+    ax.plot(f, s)
+    # Adjust limits
+    idx = np.where(f >= cutoff)[0][0]
+    lim_low = np.min(s[:idx]) - (np.max(s[:idx]) - np.min(s[:idx])) * 0.1
+    lim_high = np.max(s[:idx]) + (np.max(s[:idx]) - np.min(s[:idx])) * 0.1
+    ax.set_ylim([lim_low, lim_high])
     for i in range(len(f_range)):
         if isinstance(f_range[i], np.ndarray):
             ax.axvspan(f_range[i][0], f_range[i][-1], color='red', alpha=0.3)
         else:
-            ax.vlines(f_range[i], -np.max(np.abs(20 * np.log10(s))) * 1.1, np.max(20 * np.log10(s)) * 0.9,
+            ax.vlines(f_range[i], lim_low, lim_high,
                       color='red', alpha=0.3)
     plt.show()
     del figure, ax
@@ -139,7 +145,8 @@ def eliminate_harmonic(f, s, f_range, cutoff=100):
             s_low = s[idx_low]
             s_high = s[idx_high]
             n_interpolate = idx_high - idx_low
-            seg_int = np.linspace(0, f_high - f_low, n_interpolate) * (s_high - s_low) / (f_high - f_low) + s_low
+            f_space = np.linspace(f_low, f_high, n_interpolate)
+            seg_int = s_low + (f_space - f_low) * (s_high - s_low) / (f_high - f_low)
             s[idx_low:idx_high, 0] = seg_int
         else:
             idx_low = np.where(f == find_nearest(f, f_range[i]))[0] - 1
@@ -158,19 +165,19 @@ def eliminate_harmonic(f, s, f_range, cutoff=100):
     # plot singular values w.o. harmonic peaks
     figure, ax = plt.subplots()
     ax.set_xlim([0, cutoff])
-    ax.set_ylim([-np.max(np.abs(20 * np.log10(s))) * 1.1, np.max(20 * np.log10(s)) * 0.9])
+    ax.set_ylim([lim_low, lim_high])
     ax.set_xlabel('f (Hz)')
     ax.set_ylabel('Singular Values (dB)')
-    ax.plot(f, 20 * np.log10(s))
+    ax.plot(f, s)
     for i in range(len(f_range)):
         if isinstance(f_range[i], np.ndarray):
             ax.axvspan(f_range[i][0], f_range[i][-1], color='red', alpha=0.3)
         else:
-            ax.vlines(f_range[i], -np.max(np.abs(20 * np.log10(s))) * 1.1, np.max(20 * np.log10(s)) * 0.9,
+            ax.vlines(f_range[i], lim_low, lim_high,
                       color='red', alpha=0.3)
     plt.show()
 
-    return s
+    return 10 ** (s / 20)
 
 
 def cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=0.5):
@@ -423,7 +430,7 @@ def sdof_half_power(f, y, fn):
     return fn * 2 * np.pi, zeta_est
 
 
-def sdof_time_domain_fit(y, f, n_skip=3, n_peaks=30, plot=False):
+def sdof_time_domain_fit(y, f, n_skip=4, n_peaks=30, plot=True):
     y[np.isnan(y)] = 0
 
     # rearrange arrays
@@ -548,3 +555,4 @@ def mode_opt(f, s1, s2, u, f_peak, plot=False):
         plt.legend()
         plt.show()
     return u_out
+
