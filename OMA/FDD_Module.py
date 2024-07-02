@@ -3,23 +3,25 @@ import matplotlib.pyplot as plt
 from matplotlib.widgets import Slider
 import scipy
 
+"""Classes"""
 
-# Global Variables
+
 class SliderValClass:
     slider_val = 0
 
 
+""" Functions """
+
+
 def group_indices(indices):
+    """group_indices(indices) returns groups of neighbouring indices..."""
     # Sort the indices to ensure they are in order
     indices = sorted(indices)
-
     # Initialize an empty list to store the results
     result = []
-
     # Initialize variables to track the start and end of a range
     start = indices[0]
     end = start
-
     for i in range(1, len(indices)):
         if indices[i] == end + 1:
             # If the current index is consecutive, update the end of the range
@@ -33,23 +35,25 @@ def group_indices(indices):
             # Reset the start and end for the new range
             start = indices[i]
             end = start
-
     # Append the last range or single index
     if start == end:
         result.append(start)
     else:
         result.append(np.arange(start, end + 1))
-
     return result
 
 
 def find_nearest(array, value):
+    """find_nearest(array, value) retrieves the array value, which is nearest to the specified value and returns
+    it... """
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return array[idx]
 
 
 def harmonic_est(data, delta_f, f_max, fs, plot=True):
+    """harmonic_est(data, delta_f, f_max, fs, plot=True) applies the harmonic estimation technique from the paper
+    Eliminating the Influence of Harmonic Components in Operational Modal Analysis from Jacobsen, Andersen, Brincker """
     # notify user
     print("Estimation of harmonic signals started...")
     # get dimensions
@@ -71,8 +75,6 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
             data_filt = scipy.signal.filtfilt(b[j, :], a[j, :], data_norm[:, i])
             # only use second half of data due to filter behaviour
             data_filt = data_filt[len(data_filt) // 2:-1]
-            # plt.plot(data_filt)
-            # plt.show()
             # calculate kurtosis
             kurtosis[i] = scipy.stats.kurtosis(data_filt, fisher=True)
         kurtosis_mean[j] = np.mean(kurtosis)
@@ -97,10 +99,15 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
     # plot relevant kurtosis mean and frequency range
     # vertival limits
     if plot:
+        # Enable LaTeX rendering
+        plt.rc('text', usetex=True)
+        plt.rc('font', family='serif')
         fig, ax = plt.subplots()
         ax.set_ylim([-np.max(np.abs(kurtosis_mean)) * 1.5, np.max(np.abs(kurtosis_mean)) * 1.5])
         ax.set_xlim([0, f_max])
-        ax.plot(f_axis, kurtosis_mean)
+        ax.plot(f_axis, kurtosis_mean, color=(0, 0, 0), linewidth=1)
+        ax.set_xlabel(r'$f$\,/Hz')
+        ax.set_ylabel(r'$Kurtosis$')
         for i in range(len(harmonic_f)):
             if isinstance(harmonic_f[i], np.ndarray):
                 ax.axvspan(harmonic_f[i][0], harmonic_f[i][-1], color='red', alpha=0.3)
@@ -113,11 +120,16 @@ def harmonic_est(data, delta_f, f_max, fs, plot=True):
 
 
 def eliminate_harmonic(f, s, f_range, cutoff=100):
+    """eliminate_harmonic(f, s, f_range, cutoff=100) cuts out identified frequency ranges and linearily interpolates
+    them... """
+    # Enable LaTeX rendering
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
     figure, ax = plt.subplots()
     ax.set_xlim([0, cutoff])
-    ax.set_xlabel('f (Hz)')
-    ax.set_ylabel('Singular Values (dB)')
-    ax.plot(f, s)
+    ax.set_xlabel(r'$f$\,/\,Hz')
+    ax.set_ylabel(r'$Singular Values$\,/\,dB')
+    ax.plot(f, s, color=(0, 0, 0), linewidth=1)
     # Adjust limits
     idx = np.where(f >= cutoff)[0][0]
     lim_low = np.min(s[:idx]) - (np.max(s[:idx]) - np.min(s[:idx])) * 0.1
@@ -164,11 +176,14 @@ def eliminate_harmonic(f, s, f_range, cutoff=100):
 
     # plot singular values w.o. harmonic peaks
     figure, ax = plt.subplots()
+    # Enable LaTeX rendering
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
     ax.set_xlim([0, cutoff])
     ax.set_ylim([lim_low, lim_high])
-    ax.set_xlabel('f (Hz)')
-    ax.set_ylabel('Singular Values (dB)')
-    ax.plot(f, s)
+    ax.set_xlabel(r'$f$\,/\,Hz')
+    ax.set_ylabel(r'$Singular Values$\,/\,dB')
+    ax.plot(f, s, color=(0, 0, 0), linewidth=1)
     for i in range(len(f_range)):
         if isinstance(f_range[i], np.ndarray):
             ax.axvspan(f_range[i][0], f_range[i][-1], color='red', alpha=0.3)
@@ -181,20 +196,17 @@ def eliminate_harmonic(f, s, f_range, cutoff=100):
 
 
 def cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=0.5):
+    """cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=0.5) applies Welch's Method for
+    estimating the SD Matrix needed for FDD... """
     # get dimensions
     n_rows, n_cols = data.shape
 
     # notify user
     print("CPSD calculations started...")
 
-    # CSPD-Parameters (PyOMA) -> Use a mix between matlab default and pyoma
-    # df = fs / n_rows * 2
-    # n_per_seg = int(fs / df)
-    # n_overlap = np.floor(n_per_seg*0.5)
-    # window = 'hann'
-    # CSPD-Parameters (Matlab-Style) -> very good for fitting
-    n_per_seg = np.floor(n_rows / n_seg)  # divide into 8 segments
-    n_overlap = np.floor(overlap * n_per_seg)  # Matlab uses zero overlap
+    # parameters for welch's method
+    n_per_seg = np.floor(n_rows / n_seg)
+    n_overlap = np.floor(overlap * n_per_seg)
 
     # preallocate cpsd-matrix and frequency vector
     n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed
@@ -226,6 +238,8 @@ def cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=
 
 
 def sv_decomp(mat):
+    """sv_decomp(mat) performs the singular value decomposition on each SD-Matrix of a Spectrum and returns the first
+    two Singular Values/Vectors """
     # get dimensions
     n_cols, _, n_rows = mat.shape
 
@@ -248,6 +262,11 @@ def sv_decomp(mat):
 
 
 def prominence_adjust(x, y, cutoff):
+    """prominence_adjust(x, y, cutoff) is a UI-function to interactively change the peak prominence of the findpeaks
+    function, to allow for the user to perform peak picking without too many available peaks... """
+    # Enable LaTeX rendering
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
     # Adjusting peak-prominence with slider
     min_prominence = 0
     max_prominence = abs(max(y))
@@ -282,9 +301,9 @@ def prominence_adjust(x, y, cutoff):
         figure.canvas.draw_idle()
 
     slider.on_changed(update)
-    ax.plot(x, y)
-    ax.set_xlabel('f (Hz)')
-    ax.set_ylabel('Singular Values (dB)')
+    ax.plot(x, y, color=(0, 0, 0), linewidth=1)
+    ax.set_xlabel(r'$f$\,/\,Hz')
+    ax.set_ylabel(r'$Singular Values$\,/\,dB')
     ax.set_xlim([0, cutoff])
     plt.show()
 
@@ -292,6 +311,11 @@ def prominence_adjust(x, y, cutoff):
 
 
 def peak_picking(x, y, y2, n_sval=1, cutoff=100):
+    """peak_picking(x, y, y2, n_sval=1, cutoff=100) is a UI-function which allows the user to pick the peaks on a
+    spectrum, which it then returns... """
+    # Enable LaTeX rendering
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
     y = y.ravel()
     y2 = y2.ravel()
     x = x.ravel()
@@ -337,17 +361,14 @@ def peak_picking(x, y, y2, n_sval=1, cutoff=100):
     _ = figure.canvas.mpl_connect('button_press_event', onclick)
 
     # Plot the blue data points
-    ax.plot(x, y)
-    if max(y2) <= 0.0001 * max(y):
-        scaling = 1
-    else:
-        scaling = max(y) / max(y2) / 2
+    ax.plot(x, y, color=(0, 0, 0), linewidth=1, label=r'$S_1$')
     if n_sval > 1:
-        ax.plot(x, (y2 * scaling), linewidth=0.7, color='black')
+        ax.plot(x, y2, linewidth=1, color=(0.5, 0.5, 0.5), label=r'$S_2$')
     ax.plot(x_data, y_data, 'bo')  # Plot the data points in blue
-    ax.set_title('Click to select points')
-    ax.set_xlabel('f (Hz)')
-    ax.set_ylabel('Singular Values (dB)')
+    ax.set_title('Peak-Picking')
+    ax.set_xlabel(r'$f$\,/\,Hz')
+    ax.legend()
+    ax.set_ylabel(r'$Singular Values$\,/\,dB')
 
     # Show the plot
     plt.show()
@@ -365,18 +386,18 @@ def peak_picking(x, y, y2, n_sval=1, cutoff=100):
 
 
 def mac_calc(phi, u):
-    # calculates mac value between phi and u
+    """mac_calc(phi, u) calculates mac value between phi and u..."""
     return (np.abs(phi.conj().T @ u) ** 2) / ((phi.conj().T @ phi) * (u.conj().T @ u))
 
 
 def find_widest_range(array, center_indices):
+    """find_widest_range(array, center_indices) finds the widest range of values in an array, positioned around a
+    center point... """
     array = array.flatten()
     groups = []
     group_indices = []
-
     current_group = []
     current_group_index = []
-
     for i, val in enumerate(array):
         if val != 0:
             current_group.append(val)
@@ -404,33 +425,10 @@ def find_widest_range(array, center_indices):
     return out
 
 
-def sdof_frf(f, omega_n, zeta):
-    omega = 2 * np.pi * f
-    h = 1 / (-omega ** 2 + 2j * zeta * omega * omega_n + omega_n ** 2)
-    return np.abs(h) ** 2
-
-
-def sdof_half_power(f, y, fn):
-    # removing nan
-    f = f[~np.isnan(f)]
-    y = y[~np.isnan(y)]
-
-    # Applying the half power method to estimeate the damping coefficients
-    # extract peak value and the half power value
-    y_wn = y[np.where(f == fn)]
-    threshold = 0.707 * y_wn
-    # find the range north of the threshold
-    ind_range = np.where(y >= threshold)[0]
-    ind_high = ind_range[-1]
-    ind_low = ind_range[0]
-    delta_f = f[ind_high] - f[ind_low]
-    zeta_est = delta_f / 2 / fn
-    if zeta_est == 0:
-        zeta_est = 0.001
-    return fn * 2 * np.pi, zeta_est
-
-
 def sdof_time_domain_fit(y, f, n_skip=4, n_peaks=30, plot=True):
+    """sdof_time_domain_fit(y, f, n_skip=4, n_peaks=30, plot=True) performs the fitting of the logarithmic decay of
+    an SDOF-Equivalent, as is usual for EFDD. This code is partially taken from dagghe's pyOMA ->
+    https://github.com/dagghe/PyOMA """
     y[np.isnan(y)] = 0
 
     # rearrange arrays
@@ -481,11 +479,14 @@ def sdof_time_domain_fit(y, f, n_skip=4, n_peaks=30, plot=True):
     fn_est = 1 / np.mean(np.diff(t[minmax_fit_idx]) * 2)
     # plot the minima and maxima over the free decay
     if plot:
-        plt.plot(t, sdof_corr, label='Autocorrelation of SDOF bell at ' + str(fn_est) + ' Hz')
+        # Enable LaTeX rendering
+        plt.rc('text', usetex=True)
+        plt.rc('font', family='serif')
+        plt.plot(t, sdof_corr, color=(0, 0, 0), linewidth=1, label='Autocorrelation of SDOF bell at ' + str(fn_est) + ' Hz')
         # plt.plot(t[minmax_fit_idx], minmax_fit)
         plt.grid(visible=True, which='minor')
-        plt.xlabel('Time Delay (s)')
-        plt.ylabel('Normalized Amplitude ()')
+        plt.xlabel(r'$\tau$\,/s')
+        plt.ylabel(r'$Normalized\,Amplitude$')
         plt.title('Autocorrelation of SDOF bell at ' + str(round(fn_est, 2)) + ' Hz')
         plt.show()
     # Fit damping ratio
@@ -500,41 +501,13 @@ def sdof_time_domain_fit(y, f, n_skip=4, n_peaks=30, plot=True):
 
     if len(y) < 3:
         return np.nan, np.nan
-    return fn_fit * 2 * np.pi, zeta_fit
-
-
-def plot_fit(fSDOF, sSDOF, wn, zeta):
-    # Plot Fitted SDOF-Bell-Functions
-    # Determine the number of rows and columns
-    _, nPeaks = fSDOF.shape
-    if nPeaks != 0:
-        num_rows = (nPeaks + 1) // 2
-        num_cols = 2 if nPeaks > 1 else 1
-        fig, axs = plt.subplots(num_rows, num_cols, figsize=(10, 8))
-        for i in range(nPeaks):
-            # Frequency vector
-            freq_start = fSDOF[~np.isnan(fSDOF[:, i])][0][i]
-            freq_end = fSDOF[~np.isnan(fSDOF[:, i])][-1][i]
-            freq_vec = np.linspace(freq_start, freq_end, 1000)
-            sSDOF_fit = sdof_frf(freq_vec, wn[i, :], zeta[i, :])
-            scaling_factor = max(sSDOF[:, i]) / max(sSDOF_fit)
-            if num_cols != 1:
-                axs[i // num_cols, i % num_cols].plot(fSDOF[:, i], sSDOF[:, i].real)
-                axs[i // num_cols, i % num_cols].plot(freq_vec, sSDOF_fit * scaling_factor)  # *scaling_factor
-                axs[i // num_cols, i % num_cols].set_title(f'SDOF-Fit {i + 1}')
-            else:
-                axs.plot(fSDOF[:, i], sSDOF[:, i].real)
-                axs.plot(freq_vec, sSDOF_fit * scaling_factor)
-                axs.set_title(f'SDOF-Fit {i + 1}')
-
-        # Adjust layout and log scale axis
-        plt.tight_layout()
-
-        # Show the plot
-        plt.show()
+    return fn_fit, zeta_fit
 
 
 def mode_opt(f, s1, s2, u, f_peak, plot=False):
+    """mode_opt(f, s1, s2, u, f_peak, plot=False) extracts the mode of a frequency range dominated by a single mode
+    at the place, where the ratio between the forst and the secon SV is largest, since there the influence of
+    orthogonality between the Singular vectors is minimized ;-)... """
     # Eliminate nan
     f = f[~np.isnan(f)]
     s1 = s1[~np.isnan(s1)]
@@ -545,14 +518,17 @@ def mode_opt(f, s1, s2, u, f_peak, plot=False):
     max_ratio = np.max(s_ratio)
     u_out = u[np.where(s_ratio == max_ratio)]
     if plot:
+        # Enable LaTeX rendering
+        plt.rc('text', usetex=True)
+        plt.rc('font', family='serif')
         # Plot first and second singular values
-        plt.plot(f, 20 * np.log10(s1), label="First Singular Value")
-        plt.plot(f, 20 * np.log10(s2), label="Second Singular Value")
+        plt.plot(f, 20 * np.log10(s1), color=(0.4, 0.4, 0.4), linewidth=0.7, label=r'$S_1$')
+        plt.plot(f, 20 * np.log10(s2), color=(0, 0, 0), linestyle='--', linewidth=0.7, label=r'$S_2$')
+        plt.plot(f, 20 * np.log10(s1/s2), color=(0, 0, 0), linewidth=1, label='$S_1/S_2$')
         plt.axvline(x=f_peak, color='black')
-        plt.xlabel("f (Hz)")
-        plt.ylabel("S1/S2 (dB)")
-        plt.title("Singular Value Ratio")
+        plt.xlabel(r'$f$\,/Hz)')
+        plt.ylabel(r'$Singular\,Values$\,/dB')
+        plt.title('Singular Value Ratio')
         plt.legend()
         plt.show()
     return u_out
-

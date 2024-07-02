@@ -1,6 +1,5 @@
 import pickle
 import numpy as np
-import matplotlib.pyplot as plt
 import scipy
 from OMA import OMA_Module as oma
 
@@ -11,18 +10,21 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Path of Measurement Files and other specifications
-    path = "Data/TiflisBruecke2/"
+    path = "Data/TiflisBruecke/"
     n_rov = 2
-    n_ref = 2
-    ref_channel = [0, 3]
+    n_ref = 1
+    ref_channel = 0
     rov_channel = [1, 2]
     ref_position = [0, 0]
+
+    # Nodes and Elements of Bridge
+    discretization = scipy.io.loadmat('Discretizations/TiflisBruecke.mat')
 
     # Cutoff frequency (band of interest)
     cutoff = 25
 
     # measurement duration
-    t_end = 1000
+    t_end = 500
 
     # Threshold for MAC
     mac_threshold = 0.99
@@ -34,11 +36,11 @@ if __name__ == '__main__':
     zero_padding = False
 
     # SSI-Parameters
-    f_lim = 0.01        # Pole stability (frequency)
-    z_lim = 0.02        # Pole stability (damping)
-    mac_lim = 0.05      # Mode stability (MAC-Value)
+    f_lim = 0.01  # Pole stability (frequency)
+    z_lim = 0.05  # Pole stability (damping)
+    mac_lim = 0.015  # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
-    ord_min = 0
+    ord_min = 5
     ord_max = 60
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
@@ -66,15 +68,11 @@ if __name__ == '__main__':
     # SVD of CPSD-matrix @ each frequency
     S, U, S2, U2 = oma.fdd.sv_decomp(mCPSD)
 
-    # harmonic filtering is active
-    # f_harmonic = oma.fdd.harmonic_est(data=acc, delta_f=0.1, f_max=cutoff, fs=Fs, plot=True)
-    # S = oma.fdd.eliminate_harmonic(vf, S, f_harmonic[1:-1])
-
     ''' Perform SSI '''
-    # Reload mat files with stored lists
-    with open('freqs2.pkl', 'rb') as f:
+    # Reload mat files with stored lists from the SSI on the complete measurement Data
+    with open('Data/SSI_Data/freqsTiflis1.pkl', 'rb') as f:
         freqs = pickle.load(f)
-    with open('status2.pkl', 'rb') as f:
+    with open('Data/SSI_Data/statusTiflis1.pkl', 'rb') as f:
         status = pickle.load(f)
 
     fPeaks, Peaks, nPeaks = oma.ssi.peak_picking_ssi(x=vf,
@@ -84,76 +82,96 @@ if __name__ == '__main__':
                                                      cutoff=cutoff)
 
     '''Extract modal damping by averaging over the damping values of each dataset'''
-    # Scaling the mode shapes
-    '''
-    wn, zeta, PHI = oma.modal_extract(path=path,
-                                      Fs=Fs,
-                                      n_rov=n_rov,
-                                      n_ref=n_ref,
-                                      ref_channel=ref_channel,
-                                      ref_pos=ref_position,
-                                      t_meas=t_end,
-                                      fPeaks=fPeaks,
-                                      window=window,
-                                      overlap=overlap,
-                                      n_seg=n_seg,
-                                      zeropadding=zero_padding,
-                                      mac_threshold=mac_threshold,
-                                      plot=False)
-    '''
-    wn, zeta, PHI = oma.modal_extract_ssi(path=path,
-                                          Fs=Fs,
-                                          n_rov=n_rov,
-                                          n_ref=n_ref,
-                                          ref_channel=ref_channel,
-                                          rov_channel=rov_channel,
-                                          ref_pos=ref_position,
-                                          t_meas=t_end,
-                                          fPeaks=fPeaks,
-                                          limits=limits,
-                                          ord_min=ord_min,
-                                          ord_max=ord_max,
-                                          d_ord=1,
-                                          plot=True,
-                                          cutoff=cutoff,
-                                          Ts=1)
-    # MPC-Calculations
-    MPC = []
+    # FDD
+    wn_fdd, zeta_fdd, PHI_fdd, s_dev_fn_fdd, s_dev_zeta_fdd = oma.modal_extract_fdd(path=path,
+                                                                                    Fs=Fs,
+                                                                                    n_rov=n_rov,
+                                                                                    n_ref=n_ref,
+                                                                                    ref_channel=ref_channel,
+                                                                                    ref_pos=ref_position,
+                                                                                    t_meas=t_end,
+                                                                                    fPeaks=fPeaks,
+                                                                                    window=window,
+                                                                                    overlap=overlap,
+                                                                                    n_seg=n_seg,
+                                                                                    zeropadding=zero_padding,
+                                                                                    mac_threshold=mac_threshold,
+                                                                                    plot=False)
+    # MPC-Calculations FDD
+    MPC_fdd = []
     for i in range(nPeaks):
-        MPC.append(oma.mpc(PHI[i, :].real, PHI[i, :].imag))
+        MPC_fdd.append(oma.mpc(PHI_fdd[i, :].real, PHI_fdd[i, :].imag))
+    # Print Damping and natural frequencies
+    print("Natural Frequencies [Hz]:")
+    print(wn_fdd)
+    print("...with a standard deviation over all datasets of:")
+    print(s_dev_fn_fdd)
+    print("Damping [%]:")
+    print(zeta_fdd * 100)
+    print("...with a standard deviation over all datasets of:")
+    print(s_dev_zeta_fdd)
+    print("Modal Phase Collinearity:")
+    print(MPC_fdd)
+
+    # SSI
+    wn_ssi, zeta_ssi, PHI_ssi, s_dev_fn_ssi, s_dev_zeta_ssi = oma.modal_extract_ssi(path=path,
+                                                                                    Fs=Fs,
+                                                                                    n_rov=n_rov,
+                                                                                    n_ref=n_ref,
+                                                                                    ref_channel=ref_channel,
+                                                                                    rov_channel=rov_channel,
+                                                                                    ref_pos=ref_position,
+                                                                                    t_meas=t_end,
+                                                                                    fPeaks=fPeaks,
+                                                                                    limits=limits,
+                                                                                    ord_min=ord_min,
+                                                                                    ord_max=ord_max,
+                                                                                    plot=False,
+                                                                                    cutoff=cutoff,
+                                                                                    Ts=1)
+    # MPC-Calculations SSI
+    MPC_ssi = []
+    for i in range(nPeaks):
+        MPC_ssi.append(oma.mpc(PHI_ssi[i, :].real, PHI_ssi[i, :].imag))
 
     # Print Damping and natural frequencies
     print("Natural Frequencies [Hz]:")
-    print(wn)
+    print(wn_ssi)
+    print("...with a standard deviation over all datasets of:")
+    print(s_dev_fn_ssi)
     print("Damping [%]:")
-    print(zeta * 100)
+    print(zeta_ssi * 100)
+    print("...with a standard deviation over all datasets of:")
+    print(s_dev_zeta_ssi)
     print("Modal Phase Collinearity:")
-    print(MPC)
+    print(MPC_ssi)
 
-    # 2d-Plot modeshapes
-    for i in range(nPeaks):
-        plt.plot(np.real(PHI[i, :]), label="Mode: " + str(i + 1))
-    plt.legend()
-    plt.show()
-
-    '''Standardabweichung für die Dämpfung angeben'''
-
-    # 3d-Plot mode shapes
-    discretization = scipy.io.loadmat('Discretizations/TiflisBruecke.mat')
+    # 3d-Plot all Mode shapes from the FDD
     N = discretization['N']
     E = discretization['E']
-
     for i in range(nPeaks):
-        mode = np.zeros(PHI.shape[1] + 4, dtype=np.complex_)
-        mode[2:-2] = PHI[i, :]
-        title = "Mode " + str(i + 1) + " at " + str(round(wn[i] / 2 / np.pi, 2)) + "Hz (" + str(
-            round(zeta[i] * 100, 2)) + "%)"
+        mode = np.zeros(PHI_fdd.shape[1] + 4, dtype=np.complex_)
+        mode[2:-2] = PHI_fdd[i, :]
         oma.animate_modeshape(N,
                               E + 1,
                               mode_shape=mode.real,
-                              f_n=wn[i],
-                              zeta_n=zeta[i],
-                              mpc=MPC[i],
-                              directory="Animations/Tiflis/",
+                              f_n=wn_fdd[i],
+                              zeta_n=zeta_fdd[i],
+                              mpc=MPC_fdd[i],
+                              directory="Animations/Tiflis1_FDD/",
+                              mode_nr=i,
+                              plot=True)
+
+    # 3d-Plot all Mode shapes from the SSI
+    for i in range(nPeaks):
+        mode = np.zeros(PHI_ssi.shape[1] + 4, dtype=np.complex_)
+        mode[2:-2] = PHI_ssi[i, :]
+        oma.animate_modeshape(N,
+                              E + 1,
+                              mode_shape=mode.real,
+                              f_n=wn_ssi[i],
+                              zeta_n=zeta_ssi[i],
+                              mpc=MPC_ssi[i],
+                              directory="Animations/Tiflis1_SSI/",
                               mode_nr=i,
                               plot=True)

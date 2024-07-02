@@ -8,8 +8,12 @@ from matplotlib import cm, colors, tri, animation
 import glob
 import os
 
+""" Functions """
+
 
 def import_data(filename, plot, fs, time, detrend, downsample, cutoff=1000):
+    """import_data(filename, plot, fs, time, detrend, downsample, cutoff=1000) imports data from .mat or .csv files.
+    Additional filters or other preprocessing can be adjusted... """
     # notify user
     print("Data import started...")
     # load data
@@ -66,12 +70,13 @@ def import_data(filename, plot, fs, time, detrend, downsample, cutoff=1000):
 
     # Plot data
     if plot:
-        # Plotting the Data
-        for i in range(n_cols):
-            plt.plot(t_vec, data[:, i], label="Modal Point" + str(i + 1))
-        plt.xlabel('Time')
-        plt.ylabel('Acceleration')
-        plt.title('Raw Data')
+        plt.rc('text', usetex=True)
+        plt.rc('font', family='serif')
+        # Plotting the first column of the Data
+        plt.plot(t_vec, data[:, 1], label="Modal Point" + str(i + 1))
+        plt.xlabel(r'$t$\,/s')
+        plt.ylabel(r'$a$\,/ms^{-2}')
+        plt.title('Acceleration Data')
         plt.legend()
         plt.grid(True)
         plt.show()
@@ -81,6 +86,8 @@ def import_data(filename, plot, fs, time, detrend, downsample, cutoff=1000):
 
 
 def merge_data(path, fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos, t_meas, detrend, cutoff, downsample):
+    """merge_data(path, fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos, t_meas, detrend, cutoff, downsample)
+    merges datasets in a directory of the type .mat. Only works with one and two reference sensors... """
     # import data and store in one large array
     # preallocate
     n_files = len([name for name in os.listdir(path)])
@@ -113,77 +120,15 @@ def merge_data(path, fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos, t_meas
     return data_out, fs
 
 
-# MergedPowerSpectrum
-def mps(data, fs):
-    # dimensions
-    n_rows, n_cols = data.shape
-
-    if n_cols <= 2:
-        raise ValueError()
-    # MPS calculations
-    window = 'hamming'
-    n_per_seg = np.floor(n_rows / 8)  # divide into 8 segments
-    n_overlap = np.floor(0.5 * n_per_seg)  # Matlab uses zero overlap
-
-    # preallocate cpsd-matrix and frequency vector
-    n_fft = int(n_per_seg / 2 + 1)  # limit the amount of fft datapoints to increase speed
-    mps_mat = np.zeros((n_fft, n_cols), dtype=np.complex_)
-    f = np.zeros((n_fft, 1))
-    max_vec = np.zeros((n_cols, 1))
-
-    # The first two mps entries are just the auto spectral densities
-    for i in range(2):
-        f, mps_mat[:, i] = scipy.signal.csd(data[:, i],
-                                            data[:, i],
-                                            fs=fs,
-                                            nperseg=n_per_seg,
-                                            noverlap=n_overlap,
-                                            window=window)
-    for i in range(2, n_cols):
-        _, f_temp_i = scipy.signal.csd(data[:, i],
-                                       data[:, i],
-                                       fs=fs,
-                                       nperseg=n_per_seg,
-                                       noverlap=n_overlap,
-                                       window=window)
-        _, f_temp_i_1 = scipy.signal.csd(data[:, i - 1],
-                                         data[:, i - 1],
-                                         fs=fs,
-                                         nperseg=n_per_seg,
-                                         noverlap=n_overlap,
-                                         window=window)
-        mps_term_1 = np.divide(f_temp_i, f_temp_i_1)
-        mps_mat[:, i] = mps_term_1 * mps_mat[:, i - 1]
-        max_vec[i] = np.max(mps_mat[:, i].real)
-    mps_mat = mps_mat / np.max(max_vec)
-    # 3d-plot mps
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
-
-    # Plot each z-vector as a line at different y positions
-    _, n_mps = mps_mat.shape
-    for i in range(n_mps):
-        ax.plot(f, np.full_like(f, i), mps_mat[:, i].real)
-
-    # Set labels and title
-    ax.set_xlabel('f/Hz')
-    ax.set_ylabel('Position/m')
-    ax.set_zlabel('Spectral Density')
-    ax.set_title('RRNPS')
-
-    # Add legend
-    # plt.legend()
-
-    plt.show()
-
-
-def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, window, overlap, n_seg, zeropadding,
-                  mac_threshold=0.95, plot=False):
+def modal_extract_fdd(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, window, overlap, n_seg, zeropadding,
+                      mac_threshold=0.95, plot=False):
+    """ Extracts the modal parameters for each dataset within a directory, scales the modes, averages the frequencies
+    and damping values. This modal_extract function is based on the EFDD-Method...."""
     # variables
     nPeaks = len(fPeaks)
     n_files = len([name for name in os.listdir(path)])
     # Preallocate arrays natural frequencies, damping and the reference/roving modes
-    wn = np.zeros((n_files, nPeaks))
+    fn = np.zeros((n_files, nPeaks))
     zetan = np.zeros((n_files, nPeaks))
     ref_modes = np.zeros((n_files, nPeaks, n_ref), dtype=np.complex_)
     rov_modes = np.zeros((n_files, nPeaks, n_rov), dtype=np.complex_)
@@ -240,43 +185,43 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
             uSDOF[indSDOF, j] = U[indSDOF, :]
 
         for j in range(nPeaks):
-            # PHI[j, :] = fdd.mode_opt(fSDOF[:, j], sSDOF[:, j], sSDOF_2[:, j], uSDOF[:, j, :], fPeaks[j], plot=True)
             # reference mode for each natural frequency (dim1 -> number of modal points; dim2 -> number of peaks)
             ref_modes[i, j] = PHI[j, ref_channel]
             # modes from the roving sensors (al modal displacements except the reference ones)
             rov_modes[i, j] = np.delete(PHI[j, :], ref_channel, axis=0)
-            # print("Ref: " + str(ref_modes[i, j]))
-            # print("Rov: " + str(rov_modes[i, j]))
 
         # Plotting the singular values
         if plot:
+            plt.rc('text', usetex=True)
+            plt.rc('font', family='serif')
             for j in range(nPeaks):
                 fSDOF_temp = fSDOF[:, j][~np.isnan(fSDOF[:, j])]
                 sSDOF_temp_1 = sSDOF[:, j][~np.isnan(sSDOF[:, j])]
                 sSDOF_temp_2 = sSDOF_2[:, j][~np.isnan(sSDOF_2[:, j])]
                 if nPeaks > 1:
-                    color = ((nPeaks - j) / nPeaks, (j + 1) / nPeaks, (nPeaks - j) / nPeaks, 1)
+                    color = ((0 + j*0.8) / nPeaks, (0 + j*0.8) / nPeaks, (0 + j*0.8) / nPeaks, 1)
                 else:
                     color = (0, 0, 0, 1)
                 plt.plot(fSDOF_temp, 20 * np.log10(sSDOF_temp_1), color=color)
-                plt.plot(fSDOF_temp, 20 * np.log10(sSDOF_temp_2), color=color)
                 plt.axvline(x=fPeaks[j], color='red', label="f = " + str(round(fPeaks[j])) + " Hz")
-            plt.xlabel('Frequency (Hz)')
-            plt.ylabel('Singular Values (dB)')
+            plt.xlabel(r'$f$\,/Hz')
+            plt.ylabel(r'$Singular\,Values$\,/dB')
             plt.title('Singular Values of SDOF Equivalents')
             plt.grid(True)
             plt.show()
 
         # Get the Damping Value by fitting the SDOFs in frequency domain
         for j in range(nPeaks):
-            wn[i, j], zetan[i, j] = fdd.sdof_time_domain_fit(y=sSDOF[:, j],
+            fn[i, j], zetan[i, j] = fdd.sdof_time_domain_fit(y=sSDOF[:, j],
                                                              f=vf,
                                                              n_skip=4,
                                                              n_peaks=30,
                                                              plot=plot)
 
     # Average damping and scaling over all datasets
-    wn_out = np.mean(wn, axis=0)
+    s_dev_fn = np.std(fn, axis=0)
+    s_dev_zeta = np.std(zetan, axis=0)
+    fn_out = np.mean(fn, axis=0)
     zeta_out = np.mean(zetan, axis=0)
 
     # decide which one of the reference sensors is used for the scaling
@@ -295,13 +240,9 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
             if n_ref > 1:
                 # modal amplitude of dataset i and frequency j
                 amp = ref_modes[i, j, :].reshape(n_ref, -1)
-                # amp_t = ref_modes[i, j, :].reshape(1, n_ref)
                 # reference amplitude from dataset 0 and frequency j
                 amp_ref = ref_modes[0, j, :].reshape(n_ref, -1)
-                # amp_ref_t = ref_modes[0, j, :].reshape(1, n_ref)
                 alpha[i * n_rov:i * n_rov + n_rov, j] = amp[ref_idx[j], :] / amp_ref[ref_idx[j], :]
-                # alpha_ij = min(1 / (amp_ref_t @ amp_ref) * amp)
-                # alpha[i * n_rov:i * n_rov + n_rov, j] = alpha_ij
             else:
                 # modal amplitude of dataset i and frequency j
                 amp = ref_modes[i, j]
@@ -316,36 +257,34 @@ def modal_extract(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPeaks, 
     # Rearrange roving modes in the order of measurement
     for i in range(nPeaks):
         phi_not_scaled[i, :] = rov_modes[:, i, :].flatten()
-
     if np.sum(ref_pos) >= 1:
         for j, pos in enumerate(ref_pos):
             # add reference modes to the not yet scaled roving modes
             phi_not_scaled = np.insert(phi_not_scaled, pos - 1, ref_modes[0, :, j], axis=1)
             # add scaling factor of 1 (none) at the positions of the reference sensors
             alpha = np.insert(alpha, pos - 1, np.ones(nPeaks), axis=0)
-
     phi_out = phi_not_scaled * alpha.T
-    scipy.io.savemat('alpha.mat', {'alpha': alpha.T})
-    return wn_out, zeta_out, phi_out
+    return fn_out, zeta_out, phi_out, s_dev_fn, s_dev_zeta
 
 
-def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos, t_meas, fPeaks, limits, ord_min, ord_max, d_ord,
-                      plot=False, cutoff=100, Ts=1):
-
+def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos, t_meas, fPeaks, limits, ord_min,
+                      ord_max, plot=False, cutoff=100, Ts=1, delta_f=0.5):
+    """ Extracts the modal parameters for each dataset within a directory, scales the modes, averages the frequencies
+    and damping values. This modal_extract function is based on the SSI-COV-Method..."""
     # Parameters
     nPeaks = len(fPeaks)
     n_files = len([name for name in os.listdir(path)])
 
     # Initializations
-    fn = np.zeros((n_files, nPeaks))        # Store each identified natural frequency of each dataset
-    zetan = np.zeros((n_files, nPeaks))     # store each identified damping ratio of each dataset
-    ref_modes = np.zeros((n_files, nPeaks, n_ref), dtype=np.complex_)   # reference mode shapes are stored here
-    rov_modes = np.zeros((n_files, nPeaks, n_rov), dtype=np.complex_)   # roving mode shapes are stored here
+    fn = np.zeros((n_files, nPeaks))  # Store each identified natural frequency of each dataset
+    zetan = np.zeros((n_files, nPeaks))  # store each identified damping ratio of each dataset
+    ref_modes = np.zeros((n_files, nPeaks, n_ref), dtype=np.complex_)  # reference mode shapes are stored here
+    rov_modes = np.zeros((n_files, nPeaks, n_rov), dtype=np.complex_)  # roving mode shapes are stored here
 
     # Frequency Ranges for the SSI_EXTRACT to average
     f_rel = []
     for j in range(nPeaks):
-        f_rel.append([fPeaks[j] - 0.5, fPeaks[j] + 0.5])
+        f_rel.append([fPeaks[j] - delta_f, fPeaks[j] + delta_f])
 
     # Import Data and do EFDD procedure for each dataset
     for i, filename in enumerate(glob.glob(os.path.join(path, '*.mat'))):
@@ -355,7 +294,7 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
                               time=t_meas,
                               detrend=False,
                               downsample=False,
-                              cutoff=cutoff*4)
+                              cutoff=cutoff * 4)
 
         # SSI - Procedure
         # Perform SSI algorithm
@@ -384,6 +323,8 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
         # End of Loop over Files .........................................................
 
     # Average damping and scaling over all datasets
+    s_dev_fn = np.std(fn, axis=0)
+    s_dev_zeta = np.std(zetan, axis=0)
     fn_out = np.nanmean(fn, axis=0)
     zeta_out = np.nanmean(zetan, axis=0)
 
@@ -416,19 +357,19 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
     # Rearrange roving modes in the order of measurement
     for i in range(nPeaks):
         phi_not_scaled[i, :] = rov_modes[:, i, :].flatten()
-
     if np.sum(ref_pos) > 0:
         for j, pos in enumerate(ref_pos):
             # add reference modes to the not yet scaled roving modes
             phi_not_scaled = np.insert(phi_not_scaled, pos - 1, ref_modes[0, :, j], axis=1)
             # add scaling factor of 1 (none) at the positions of the reference sensors
             alpha = np.insert(alpha, pos - 1, np.ones(nPeaks), axis=0)
-
     phi_out = phi_not_scaled * alpha.T
-    return fn_out, zeta_out, phi_out
+    return fn_out, zeta_out, phi_out, s_dev_fn, s_dev_zeta
 
 
 def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, plot=True):
+    """ Mode Shape animation function to create and store a gif of the specified mode shape and show it to the
+    user... """
     # Create a custom symmetrical colormap
     def symmetrical_colormap(cmap):
         n = 128
@@ -460,7 +401,7 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, pl
     # Pre-Animation Calculations (Initial Data)
     if np.sum(mode_shape) == 0 or mode_shape.any() == np.nan:
         mode_shape = np.zeros(mode_shape.shape)
-        mode_shape = mode_shape+1
+        mode_shape = mode_shape + 1
     x_diff = np.max(N[:, 0]) - np.min(N[:, 0])
     y_diff = np.max(N[:, 1]) - np.min(N[:, 1])
     longest_dim = np.max([x_diff, y_diff])
@@ -490,7 +431,7 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, pl
         new_y = []
         new_z = []
         for i in range(len(E)):
-            _z = z[i].real * np.cos(np.pi / 5 * frame) + z[i].imag * np.cos(np.pi / 5 * frame)
+            _z = z[i].real * np.cos(np.pi / 5 * frame) + z[i].imag * np.sin(np.pi / 5 * frame)
             triang = tri.Triangulation(x[i].real, y[i].real)
             refiner = tri.UniformTriRefiner(triang)
             interpolator = tri.LinearTriInterpolator(triang, _z)
@@ -517,8 +458,7 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, pl
                                   linewidth=0)
         art1[0] = ax.plot_trisurf(N[:, 0].real,
                                   N[:, 1].real,
-                                  N[:, 2].real * np.cos(np.pi / 5 * frame) + N[:, 2].imag * np.sin(
-                                      np.pi / 5 * frame),
+                                  N[:, 2].real * np.cos(np.pi / 5 * frame) + N[:, 2].imag * np.sin(np.pi / 5 * frame),
                                   triangles=E - 1,
                                   cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
                                   edgecolor='black')
@@ -532,8 +472,6 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, pl
     title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz (Zeta = {round(zeta_n * 100, 2)}%; MPC = {round(mpc * 100, 2)})"
     ax.set_title(title)
     ax.set_xlim(np.min(N[:, 0].real), np.max(N[:, 0].real))
-    ax.set_ylim(np.min(N[:, 1].real), np.max(N[:, 1].real))
-    ax.set_zlim(np.min(N[:, 2].real), np.max(N[:, 2].real))
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
@@ -555,9 +493,7 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, pl
 
     ani = animation.FuncAnimation(fig=fig, func=update, fargs=(art0, art1), frames=n_frames, interval=100,
                                   blit=False)
-    if plot:
-        plt.show()
-
+    plt.show()
     # create directory if it doesn't exist:
     filename = f"{directory}mode_{round(f_n)}Hz.gif"
     if not os.path.exists(directory):
@@ -567,8 +503,32 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, pl
     ani.save(filename, writer='pillow')
     print(f"Animation saved to {filename}!")
 
+    if plot:
+        # Enable LaTeX rendering
+        plt.rc('text', usetex=True)
+        plt.rc('font', family='serif')
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz (Zeta = {round(zeta_n * 100, 2)}\,\%; MPC = {round(mpc * 100, 2)})"
+        ax.set_title(title)
+        ax.set_xlim(np.min(N[:, 0].real), np.max(N[:, 0].real))
+        ax.set_xlabel(r'x')
+        ax.set_ylabel(r'y')
+        ax.set_zlabel(r'$Modal\,Displacement$')
+        ax.set_title(title)
+        set_axes_equal(ax)
+        ax.plot_trisurf(N[:, 0].real,
+                        N[:, 1].real,
+                        N[:, 2].real * np.cos(0) + np.real(N[:, 2].imag) * np.sin(0),
+                        triangles=E - 1,
+                        cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
+                        edgecolor='black')
+        plt.show()
+
 
 def mpc(phi_r, phi_i):
+    """mpc(phi_r, phi_i) calculates the Modal Phase Collinearity of a mode shape, which is an indicator for its
+    complexity... """
     # Calculate S_xx, S_yy, and S_xy
     S_xx = phi_r.T @ phi_r
     S_yy = phi_i.T @ phi_i
@@ -579,6 +539,11 @@ def mpc(phi_r, phi_i):
 
 
 def modal_coherence_plot(f, s, u, f_peaks, cutoff):
+    """modal_coherence_plot(f, s, u, f_peaks, cutoff) plots the modal coherence over the frequency range to show,
+    which mode dominates where. This should help with peak picking on difficult data... """
+
+    # Function still needs to be finished, it is propably not needed ata all
+
     n_peaks = len(f_peaks)
     n_data = len(f)
     # Calculate U at peaks
@@ -588,7 +553,7 @@ def modal_coherence_plot(f, s, u, f_peaks, cutoff):
         u_peaks[j, :] = u[np.where(f == f_peaks[j]), :]
     # Plot modal Coherence
     fig, ax1 = plt.subplots()
-    ax1.set_title("Modal Coherence Indicator Plot")
+    ax1.set_title('Modal Coherence Indicator')
     ax1.set_xlim([0, cutoff])
     for i in range(n_peaks):
         if n_peaks > 1:
@@ -599,7 +564,7 @@ def modal_coherence_plot(f, s, u, f_peaks, cutoff):
         d = np.zeros(n_data, dtype=np.complex_)
         for j in range(n_data):
             u_h = np.conj(u[j, :]).T
-            d[j] = u_h@u_peaks[i, :]
+            d[j] = u_h @ u_peaks[i, :]
         ax1.plot(f, d.real, color=color, label=f'ModalCoherenceIndicator for f_n = {round(f_peaks[i], 2)}')
 
     # Overlay Singular Values Plot with second y-axis
@@ -608,38 +573,3 @@ def modal_coherence_plot(f, s, u, f_peaks, cutoff):
     ax2.plot(f, s, color='black')
 
     plt.show()
-
-
-def modal_filtering(y, f_peaks, u, f, fs):
-    # Mode shape Matrix
-    n_peaks = len(f_peaks)
-    _, m = u.shape
-    u_peaks = np.zeros((n_peaks, m), dtype=np.complex_)
-    for j in range(n_peaks):
-        u_peaks[j, :] = u[np.where(f == f_peaks[j]), :]
-
-    # Perform FFT of data
-    fft_output = np.fft.fft(y)
-    yf = fft_output[:(len(fft_output) // 2)]
-    f = np.fft.fftfreq(len(y), 1 / fs)
-    vf = f[:(len(f) // 2)]
-
-    # Calculate Modal Forces
-    y1 = np.zeros((len(vf), m))
-    for i in range(m):
-        y1[:, i] = yf[:,i]
-    q = np.zeros((y1.shape[0], n_peaks), dtype=np.complex_)
-    for i in range(len(vf)):
-        a_inv = np.linalg.pinv(u_peaks.T)
-        q[i, :] = a_inv@yf[i, :].T
-
-    # calculate output
-    # y2 = np.zeros(y1.shape, dtype=np.complex_)
-    # for i in range(len(vf)):
-    #     y2[i, :] = q[i, :]@u_peaks
-
-    # plot difference
-    # y_diff = yf-y2
-    plt.plot(vf, 20*np.log10(q))
-    plt.show()
-
