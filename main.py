@@ -7,7 +7,7 @@ if __name__ == "__main__":
     discretization = scipy.io.loadmat('Discretizations/TiflisBruecke.mat')
     N = discretization['N']
     E = discretization['E']
-    mode = np.cos(np.pi*np.linspace(0, 1, len(N))) + 1j * 0.5 * np.sin(np.pi*np.linspace(0, 1, len(N)))
+    mode = np.cos(np.pi*np.linspace(0, 1, len(N)))
     oma.animate_modeshape(N=N,
                           E=E + 1,
                           f_n=5,
@@ -16,4 +16,4 @@ if __name__ == "__main__":
                           directory="Animations/Test/",
                           mode_nr=1,
                           plot=True,
-                          mpc = 100)
+                          mpc=100)

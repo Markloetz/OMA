@@ -1,5 +1,5 @@
 import pickle
-import scipy
+from matplotlib import pyplot as plt
 from OMA import OMA_Module as oma
 
 if __name__ == '__main__':
@@ -16,9 +16,6 @@ if __name__ == '__main__':
     rov_channel = [0, 1]
     ref_position = [1, 15]
 
-    # Nodes and Elements of Bridge
-    discretization = scipy.io.loadmat('Discretizations/PlateHoleDiscretization.mat')
-
     # Cutoff frequency (band of interest)
     cutoff = 200
 
@@ -26,9 +23,9 @@ if __name__ == '__main__':
     t_end = 500
 
     # SSI-Parameters
-    f_lim = 0.01  # Pole stability (frequency)
-    z_lim = 0.05  # Pole stability (damping)
-    mac_lim = 0.015  # Mode stability (MAC-Value)
+    f_lim = 0.05  # Pole stability (frequency)
+    z_lim = 0.01  # Pole stability (damping)
+    mac_lim = 0.15  # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
     ord_min = 5
     ord_max = 60
@@ -48,10 +45,13 @@ if __name__ == '__main__':
 
     freqs, zeta, modes, _, _, status = oma.ssi.SSICOV(acc,
                                                       dt=1 / Fs,
-                                                      Ts=0.8,
+                                                      Ts=0.5,
                                                       ord_min=ord_min,
                                                       ord_max=ord_max,
                                                       limits=limits)
+
+    oma.ssi.stabilization_diag(freqs=freqs, label=status, cutoff=cutoff)
+    plt.show()
 
     # Save Results from SSI
     with open('Data/SSI_Data/freqsPlate.pkl', 'wb') as f:

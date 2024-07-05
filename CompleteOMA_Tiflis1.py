@@ -146,6 +146,9 @@ if __name__ == '__main__':
     print("Modal Phase Collinearity:")
     print(MPC_ssi)
 
+    # Compare the two results using the MAC-Matrix
+    oma.plot_mac_matrix(PHI_ssi, PHI_fdd, wn_ssi, wn_fdd)
+
     # 3d-Plot all Mode shapes from the FDD
     N = discretization['N']
     E = discretization['E']

@@ -36,9 +36,9 @@ if __name__ == '__main__':
     zero_padding = False
 
     # SSI-Parameters
-    f_lim = 0.01  # Pole stability (frequency)
-    z_lim = 0.05  # Pole stability (damping)
-    mac_lim = 0.02  # Mode stability (MAC-Value)
+    f_lim = 0.05    # Pole stability (frequency)
+    z_lim = 0.1     # Pole stability (damping)
+    mac_lim = 0.1   # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
     ord_min = 5
     ord_max = 60
@@ -128,8 +128,8 @@ if __name__ == '__main__':
                                                                                     ord_max=ord_max,
                                                                                     plot=False,
                                                                                     cutoff=cutoff,
-                                                                                    Ts=1,
-                                                                                    delta_f=0.4)
+                                                                                    Ts=0.8,
+                                                                                    delta_f=0.2)
     # MPC-Calculations SSI
     MPC_ssi = []
     for i in range(nPeaks):
@@ -147,29 +147,28 @@ if __name__ == '__main__':
     print("Modal Phase Collinearity:")
     print(MPC_ssi)
 
+    # Compare the two results using the MAC-Matrix
+    oma.plot_mac_matrix(PHI_ssi, PHI_fdd, wn_ssi, wn_fdd)
+
     # 3d-Plot all Mode shapes from the FDD
     N = discretization['N']
     E = discretization['E']
     for i in range(nPeaks):
-        mode = np.zeros(PHI_fdd.shape[1] + 4, dtype=np.complex_)
-        mode[2:-2] = PHI_fdd[i, :]
         oma.animate_modeshape(N,
                               E,
-                              mode_shape=mode.real,
+                              mode_shape=PHI_fdd[:, i],
                               f_n=wn_fdd[i],
                               zeta_n=zeta_fdd[i],
                               mpc=MPC_fdd[i],
                               directory="Animations/Plate_FDD/",
                               mode_nr=i,
-                              plot=False)
+                              plot=True)
 
     # 3d-Plot all Mode shapes from the SSI
     for i in range(nPeaks):
-        mode = np.zeros(PHI_ssi.shape[1] + 4, dtype=np.complex_)
-        mode[2:-2] = PHI_ssi[i, :]
         oma.animate_modeshape(N,
                               E + 1,
-                              mode_shape=mode.real,
+                              mode_shape=PHI_ssi,
                               f_n=wn_ssi[i],
                               zeta_n=zeta_ssi[i],
                               mpc=MPC_ssi[i],

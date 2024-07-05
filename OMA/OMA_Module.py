@@ -573,3 +573,64 @@ def modal_coherence_plot(f, s, u, f_peaks, cutoff):
     ax2.plot(f, s, color='black')
 
     plt.show()
+
+
+def plot_mac_matrix(phi_1, phi_2, wn_1, wn_2):
+    """
+    Compute the MAC matrix between two mode shapes and plot it in 3D.
+
+    Parameters:
+    phi_1, phi_2 : ndarray
+        Mode shape vectors. Phi1 -> SSI-Reasult; Phi2 -> FDD Result
+    natural_frequency : float
+        Natural frequency.
+    damping_ratio : float
+        Damping ratio.
+    MPC : float
+        Some value MPC (not used in MAC calculation but passed as a parameter).
+    """
+    # Compute MAC matrix
+    n_freq = phi_1.shape[0]
+    MAC = np.zeros((n_freq, n_freq), dtype=np.complex_)
+    for i in range(n_freq):
+        for j in range(n_freq):
+            MAC[i, j] = fdd.mac_calc(phi_1[i, :], phi_2[j, :])
+
+    MAC = MAC.real
+    # Plot the MAC matrix in 3D
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+    # Colormap
+    norm = colors.Normalize(0, 1.5)
+    colors_ = plt.cm.Greys(norm(MAC))
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    x, y = np.meshgrid(range(n_freq), range(n_freq))
+    x = x.flatten()
+    y = y.flatten()
+    z = np.zeros_like(x)
+    dx = dy = 0.8
+    dz = MAC.flatten()
+
+    ax.bar3d(x, y, z, dx, dy, dz, shade=True, color=colors_.reshape(-1, 4))
+    ax.invert_xaxis()
+    # Customize axis labels
+    x_labels = [f'{round(wn_1[i], 2)} Hz' for i in range(n_freq)]
+    y_labels = [f'{round(wn_2[i], 2)} Hz' for i in range(n_freq)]
+
+    ax.set_xticks(np.arange(n_freq))
+    ax.set_yticks(np.arange(n_freq))
+    ax.set_xticklabels(x_labels, rotation=90, ha='center')
+    ax.set_yticklabels(y_labels, rotation=-45, ha='left')
+
+    # Create a scalar mappable object for color mapping
+    # mappable = cm.ScalarMappable(norm=norm, cmap='Greys')
+    # mappable.set_array(MAC)
+    # Add colorbar
+    # cbar = plt.colorbar(mappable, ax=ax, shrink=0.6)
+    # cbar.set_label('MAC Value')
+
+    ax.set_zlabel('MAC Value')
+    title = f"MAC-Matrix between SSI-COV Modes and FDD Modes"
+    plt.title(title)
+    plt.show()
