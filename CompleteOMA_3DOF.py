@@ -13,7 +13,7 @@ if __name__ == '__main__':
     n_ref = 0
     ref_channel = None
     rov_channel = [0, 1, 2]
-    ref_position = [0, 0]
+    ref_position = None
 
     # Cutoff frequency (band of interest)
     cutoff = 30
@@ -29,7 +29,7 @@ if __name__ == '__main__':
 
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 50
+    n_seg = 25
     overlap = 0.5
 
     # SSI-Parameters
@@ -83,7 +83,7 @@ if __name__ == '__main__':
                                                      label=status,
                                                      cutoff=cutoff)
 
-    '''Extract modal damping by averaging over the damping values of each dataset'''
+    '''Extract modal parameters by averaging over each dataset'''
     # FDD
     wn_fdd, zeta_fdd, PHI_fdd, _, _ = oma.modal_extract_fdd(path=path,
                                                             Fs=Fs,

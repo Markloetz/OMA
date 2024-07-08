@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import scipy
 from OMA import OMA_Module as oma
@@ -9,18 +10,18 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Path of Measurement Files and other specifications
-    path = "Data/TiflisBruecke/"
+    path = "Data/GrenoblerBruecke/"
     n_rov = 2
-    n_ref = 1
-    ref_channel = 0
-    rov_channel = [1, 2]
+    n_ref = None
+    ref_channel = None
+    rov_channel = [0, 1]
     ref_position = None
 
     # Cutoff frequency (band of interest)
-    cutoff = 20
+    cutoff = 30
 
     # measurement duration
-    t_end = 500
+    t_end = 1200
 
     # Threshold for MAC
     mac_threshold = 0.99
@@ -30,7 +31,7 @@ if __name__ == '__main__':
 
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 50
+    n_seg = 100
     overlap = 0.5
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
@@ -79,7 +80,7 @@ if __name__ == '__main__':
                                                 overlap=overlap,
                                                 n_seg=n_seg,
                                                 mac_threshold=mac_threshold,
-                                                plot=True)
+                                                plot=False)
 
     # MPC-Calculations
     MPC = []
@@ -94,20 +95,8 @@ if __name__ == '__main__':
     print("Modal Phase Collinearity:")
     print(MPC)
 
-    # 3d-Plot mode shapes
-    discretization = scipy.io.loadmat('Discretizations/TiflisBruecke.mat')
-    N = discretization['N']
-    E = discretization['E']
-
+    # 2d-Plot mode shapes
     for i in range(nPeaks):
-        mode = np.zeros(PHI.shape[1] + 4, dtype=np.complex_)
-        mode[2:-2] = PHI[i, :]
-        oma.animate_modeshape(N,
-                              E + 1,
-                              mode_shape=mode,
-                              f_n=fn[i],
-                              zeta_n=zeta[i],
-                              mpc=MPC[i],
-                              directory="Animations/Tiflis1_FDD/",
-                              mode_nr=i,
-                              plot=True)
+        plt.plot(PHI[i, :].real, label=f"Mode{i+1}")
+    plt.legend()
+    plt.show()

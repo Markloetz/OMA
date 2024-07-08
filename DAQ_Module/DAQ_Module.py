@@ -155,6 +155,58 @@ def daq_oma(device_in, channels, duration, fs, acc_sensitivities):
     return acc_data_out
 
 
+def daq_oma_2dev(device1, device2, channels_1, channels_2, duration, fs, acc_sensitivities):
+    with nidaqmx.Task() as acc_task:
+        # Configure IEPE task
+        for channel in channels_1:
+            acc_task.ai_channels.add_ai_accel_chan(f"{device1}/ai{channel}",
+                                                   sensitivity=1,
+                                                   units=AccelUnits.G,
+                                                   current_excit_val=0.002,
+                                                   sensitivity_units=AccelSensitivityUnits.MILLIVOLTS_PER_G)
+        for channel in channels_2:
+            acc_task.ai_channels.add_ai_accel_chan(f"{device2}/ai{channel}",
+                                                   sensitivity=1,
+                                                   units=AccelUnits.G,
+                                                   current_excit_val=0.002,
+                                                   sensitivity_units=AccelSensitivityUnits.MILLIVOLTS_PER_G)
+
+        acc_task.timing.cfg_samp_clk_timing(rate=fs,
+                                            sample_mode=AcquisitionType.FINITE,
+                                            samps_per_chan=(duration + 4) * fs)
+
+        # record accelerations
+        acc_task.start()
+        print('DAQ Start')
+        # print time
+        t_start = time.time()
+        t_cur = 0
+        while (t_cur-t_start) < duration:
+            time.sleep(1)
+            t_cur = time.time()
+            t_elapsed = t_cur-t_start
+            print(int(t_elapsed), end='\r')
+        acc_data = acc_task.read(number_of_samples_per_channel=(duration + 4) * fs, timeout=duration + 4)
+
+        # Stop everything
+        acc_task.stop()
+        print('DAQ Stop')
+
+        # Convert to numpy array
+        acc_data = np.array(acc_data)
+        acc_data = acc_data.transpose()
+        acc_data_out = np.zeros((duration * fs, len(channels_1)+len(channels_2)))
+        for channel in channels_1:
+            acc_data_out[:, channel] = acc_data[(2 * fs):-(2 * fs), channel] / 1000 / \
+                                       acc_sensitivities[channel]
+            print(f"out({channel}) = data({channel})")
+        for channel in channels_2:
+            acc_data_out[:, channel+len(channels_1)] = acc_data[(2 * fs):-(2 * fs), channel+len(channels_1)] / 1000 / \
+                                       acc_sensitivities[channel+len(channels_1)]
+            print(f"out({channel+len(channels_1)}) = data({channel+len(channels_1)})")
+    return acc_data_out
+
+
 def plot_data(data, sample_rate):
     time = np.arange(data.shape[0]) / sample_rate
     fig, ax = plt.subplots(data.shape[1], 1, sharex=True)

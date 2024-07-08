@@ -112,7 +112,7 @@ def merge_data(path, fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos, t_meas
             data_out[:, i * n_rov + j] = data[:, start_idx + ch]
 
     # Check if reference sensor(s) need to be merged into the complete dataset
-    if np.mean(ref_pos) > 0:
+    if ref_pos:
         for i, pos in enumerate(ref_pos):
             print("out(" + str(pos - 1) + ") = data(" + str(ref_channel[i]) + ")")
             data_out = np.insert(data_out, pos - 1, data[:, ref_channel[i]], axis=1)
@@ -259,7 +259,7 @@ def modal_extract_fdd(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPea
         # Rearrange roving modes in the order of measurement
         for i in range(nPeaks):
             phi_not_scaled[i, :] = rov_modes[:, i, :].flatten()
-        if np.sum(ref_pos) >= 1:
+        if ref_pos:
             for j, pos in enumerate(ref_pos):
                 # add reference modes to the not yet scaled roving modes
                 phi_not_scaled = np.insert(phi_not_scaled, pos - 1, ref_modes[0, :, j], axis=1)
@@ -367,7 +367,7 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
         # Rearrange roving modes in the order of measurement
         for i in range(nPeaks):
             phi_not_scaled[i, :] = rov_modes[:, i, :].flatten()
-        if np.sum(ref_pos) > 0:
+        if ref_pos:
             for j, pos in enumerate(ref_pos):
                 # add reference modes to the not yet scaled roving modes
                 phi_not_scaled = np.insert(phi_not_scaled, pos - 1, ref_modes[0, :, j], axis=1)

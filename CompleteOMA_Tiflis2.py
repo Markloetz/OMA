@@ -15,7 +15,7 @@ if __name__ == '__main__':
     n_ref = 2
     ref_channel = [0, 3]
     rov_channel = [1, 2]
-    ref_position = [0, 0]
+    ref_position = None
 
     # Nodes and Elements of Bridge
     discretization = scipy.io.loadmat('Discretizations/TiflisBruecke.mat')
