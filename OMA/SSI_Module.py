@@ -217,9 +217,9 @@ def SSICOV(y, dt, Ts, ord_min, ord_max, limits):
     return fn2, zeta2, phi2, order, MAC, stability_status
 
 
-def stabilization_diag(freqs, label, cutoff, plot="all"):
+def stabilization_diag(freqs, label, cutoff, plot="stable"):
     """returns the figure/axes object of a stabilization diagram. Specify if all poles if all poles are to be plotted
-    with ll and only poles stable in all categories with stable"""
+    with all and only poles stable in all categories with stable"""
     # Create a figure and axis object
     order_min = len(freqs[0])
     fig, ax = plt.subplots()

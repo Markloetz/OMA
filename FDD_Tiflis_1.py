@@ -32,7 +32,6 @@ if __name__ == '__main__':
     window = 'hann'
     n_seg = 50
     overlap = 0.5
-    zero_padding = False
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
     # import data
@@ -51,7 +50,6 @@ if __name__ == '__main__':
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc,
                                     fs=Fs,
-                                    zero_padding=zero_padding,
                                     n_seg=n_seg,
                                     window=window,
                                     overlap=overlap)
@@ -80,7 +78,6 @@ if __name__ == '__main__':
                                                 window=window,
                                                 overlap=overlap,
                                                 n_seg=n_seg,
-                                                zeropadding=zero_padding,
                                                 mac_threshold=mac_threshold,
                                                 plot=True)
 

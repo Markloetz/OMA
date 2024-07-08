@@ -195,7 +195,7 @@ def eliminate_harmonic(f, s, f_range, cutoff=100):
     return 10 ** (s / 20)
 
 
-def cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=0.5):
+def cpsd_matrix(data, fs, n_seg=8, window='hamming', overlap=0.5):
     """cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=0.5) applies Welch's Method for
     estimating the SD Matrix needed for FDD... """
     # get dimensions
@@ -222,14 +222,6 @@ def cpsd_matrix(data, fs, zero_padding=True, n_seg=8, window='hamming', overlap=
                                      nperseg=n_per_seg,
                                      noverlap=n_overlap,
                                      window=window)
-            if zero_padding:
-                # apply ifft to calculate autocorrelation
-                corr = np.fft.ifft(a=sd, n=len(sd), norm='ortho').real
-                # apply triangular window
-                corr = corr[:len(corr) // 2] * scipy.signal.windows.triang(len(corr), sym=True)[:len(corr) // 2]
-                # recalculate spectral density
-                sd = np.fft.fft(corr, len(f))
-                f = np.linspace(0, max(f), len(sd))
             cpsd[i, j, :] = sd
     # notify user
     print("CPSD calculations ended...")

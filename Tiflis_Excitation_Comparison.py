@@ -66,11 +66,9 @@ if __name__ == '__main__':
     window = 'hann'
     n_seg = 100
     overlap = 0.5
-    zero_padding = False
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc1,
                                     fs=Fs,
-                                    zero_padding=zero_padding,
                                     n_seg=n_seg,
                                     window=window,
                                     overlap=overlap)
@@ -96,7 +94,6 @@ if __name__ == '__main__':
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc2,
                                     fs=Fs,
-                                    zero_padding=zero_padding,
                                     n_seg=n_seg,
                                     window=window,
                                     overlap=overlap)
@@ -122,7 +119,6 @@ if __name__ == '__main__':
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc3[:, :3],
                                     fs=Fs,
-                                    zero_padding=zero_padding,
                                     n_seg=n_seg*2,
                                     window=window,
                                     overlap=overlap)
