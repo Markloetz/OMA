@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm, colors, tri, animation
 import glob
 import os
+import warnings
 
 """ Functions """
 
@@ -193,14 +194,14 @@ def modal_extract_fdd(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPea
 
         # Plotting the singular values
         if plot:
-            # plt.rc('text', usetex=True)
-            # plt.rc('font', family='serif')
+            plt.rc('text', usetex=True)
+            plt.rc('font', family='serif')
             for j in range(nPeaks):
                 fSDOF_temp = fSDOF[:, j][~np.isnan(fSDOF[:, j])]
                 sSDOF_temp_1 = sSDOF[:, j][~np.isnan(sSDOF[:, j])]
                 sSDOF_temp_2 = sSDOF_2[:, j][~np.isnan(sSDOF_2[:, j])]
                 if nPeaks > 1:
-                    color = ((0 + j*0.8) / nPeaks, (0 + j*0.8) / nPeaks, (0 + j*0.8) / nPeaks, 1)
+                    color = ((0 + j * 0.8) / nPeaks, (0 + j * 0.8) / nPeaks, (0 + j * 0.8) / nPeaks, 1)
                 else:
                     color = (0, 0, 0, 1)
                 plt.plot(fSDOF_temp, 20 * np.log10(sSDOF_temp_1), color=color)
@@ -298,44 +299,50 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
                               time=t_meas,
                               detrend=False,
                               downsample=False,
-                              cutoff=cutoff * 4)
+                              cutoff=cutoff)
 
         # SSI - Procedure
         # Perform SSI algorithm
-        freqs, zeta, modes, orders, _, status = ssi.SSICOV(data,
-                                                           dt=1 / Fs,
-                                                           Ts=Ts,
-                                                           ord_min=ord_min,
-                                                           ord_max=ord_max,
-                                                           limits=limits)
+        freqs, zeta, modes, _, _, status = ssi.SSICOV(data,
+                                                      dt=1 / Fs,
+                                                      Ts=Ts,
+                                                      ord_min=ord_min,
+                                                      ord_max=ord_max,
+                                                      limits=limits)
 
         # Extract parameters and store in dedicated arrays
         freqs_extract, zeta_extract, modes_extract = ssi.ssi_extract(freqs, zeta, modes, status, f_rel)
         fn[i, :] = freqs_extract
         zetan[i, :] = zeta_extract
-        if n_ref >  0:
+        if n_ref > 0:
             for j in range(nPeaks):
                 mode_curr = np.array(modes_extract[j])
                 ref_modes[i, j] = mode_curr[ref_channel]
                 rov_modes[i, j] = mode_curr[rov_channel]
         else:
-            phi_out = np.zeros((nPeaks, n_rov),dtype=np.complex_)
+            phi_out = np.zeros((nPeaks, n_rov), dtype=np.complex_)
             for j in range(nPeaks):
                 mode_curr = np.array(modes_extract[j])
                 phi_out[j, :] = mode_curr
         # stabilization diagram
         if plot:
-            fig, ax = ssi.stabilization_diag(freqs, status, cutoff)
+            fig, ax = ssi.stabilization_diag(freqs=freqs,
+                                             label=status,
+                                             cutoff=cutoff,
+                                             order_min=ord_min)
             for j in range(nPeaks):
                 ax.axvspan(f_rel[j][0], f_rel[j][1], color='red', alpha=0.3)
             plt.show()
         # End of Loop over Files .........................................................
 
-    # Average damping and scaling over all datasets
-    s_dev_fn = np.std(fn, axis=0)
-    s_dev_zeta = np.std(zetan, axis=0)
-    fn_out = np.nanmean(fn, axis=0)
-    zeta_out = np.nanmean(zetan, axis=0)
+    # I expect to see RuntimeWarnings in this block
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        # Average damping and scaling over all datasets
+        s_dev_fn = np.std(fn, axis=0)
+        s_dev_zeta = np.std(zetan, axis=0)
+        fn_out = np.nanmean(fn, axis=0)
+        zeta_out = np.nanmean(zetan, axis=0)
 
     # Mode shape scaling .................................................................
     if n_ref > 0:
@@ -382,6 +389,7 @@ def modal_extract_ssi(path, Fs, n_rov, n_ref, ref_channel, rov_channel, ref_pos,
 def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, plot=True):
     """ Mode Shape animation function to create and store a gif of the specified mode shape and show it to the
     user... """
+
     # Create a custom symmetrical colormap
     def symmetrical_colormap(cmap):
         n = 128
@@ -546,8 +554,11 @@ def mpc(phi_r, phi_i):
     S_yy = phi_i.T @ phi_i
     S_xy = phi_r.T @ phi_i
 
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", category=RuntimeWarning)
+        m_p_c = ((S_xx - S_yy) ** 2 + 4 * S_xy ** 2) / ((S_xx + S_yy) ** 2)
     # Return the MPC
-    return ((S_xx - S_yy) ** 2 + 4 * S_xy ** 2) / ((S_xx + S_yy) ** 2)
+    return m_p_c
 
 
 def modal_coherence_plot(f, s, u, f_peaks, cutoff):
@@ -601,6 +612,15 @@ def plot_mac_matrix(phi_1, phi_2, wn_1, wn_2):
     MPC : float
         Some value MPC (not used in MAC calculation but passed as a parameter).
     """
+    # Handle nan
+    nan_idx_1 = np.where(np.isnan(wn_1))[0]
+    nan_idx_2 = np.where(np.isnan(wn_2))[0]
+    nan_idx = np.union1d(nan_idx_1, nan_idx_2)
+    wn_1 = np.delete(wn_1, nan_idx)
+    wn_2 = np.delete(wn_2, nan_idx)
+    phi_1 = np.delete(phi_1, nan_idx, axis=0)
+    phi_2 = np.delete(phi_2, nan_idx, axis=0)
+
     # Compute MAC matrix
     n_freq = phi_1.shape[0]
     MAC = np.zeros((n_freq, n_freq), dtype=np.complex_)

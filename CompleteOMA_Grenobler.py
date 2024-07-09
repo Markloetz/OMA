@@ -16,7 +16,7 @@ if __name__ == '__main__':
     ref_position = None
 
     # Cutoff frequency (band of interest)
-    cutoff = 100
+    cutoff = 25
 
     # Decide if harmonic estimation needs to be used
     filt = False
@@ -25,7 +25,7 @@ if __name__ == '__main__':
     t_end = 1200
 
     # Threshold for MAC
-    mac_threshold = 0.99
+    mac_threshold = 0.98
 
     # Welch's Method Parameters
     window = 'hann'
@@ -33,12 +33,13 @@ if __name__ == '__main__':
     overlap = 0.5
 
     # SSI-Parameters
-    f_lim = 0.05  # Pole stability (frequency)
-    z_lim = 0.1  # Pole stability (damping)
-    mac_lim = 0.1  # Mode stability (MAC-Value)
+    f_lim = 0.01  # Pole stability (frequency)
+    z_lim = 0.05  # Pole stability (damping)
+    mac_lim = 0.01  # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
-    ord_min = 1
-    ord_max = 30
+    Ts = 2          # Time lag of covariance matrix [s]
+    ord_min = 20
+    ord_max = 60
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
     # import data
@@ -72,7 +73,7 @@ if __name__ == '__main__':
     # SSI
     freqs, zeta, modes, _, _, status = oma.ssi.SSICOV(acc,
                                                       dt=1 / Fs,
-                                                      Ts=1.6,
+                                                      Ts=Ts,
                                                       ord_min=ord_min,
                                                       ord_max=ord_max,
                                                       limits=limits)
@@ -81,6 +82,7 @@ if __name__ == '__main__':
                                                      y=20 * np.log10(S),
                                                      freqs=freqs,
                                                      label=status,
+                                                     ord_min=ord_min,
                                                      cutoff=cutoff)
 
     '''Extract modal parameters by averaging over each dataset'''
@@ -126,7 +128,7 @@ if __name__ == '__main__':
                                                             ord_max=ord_max,
                                                             plot=True,
                                                             cutoff=cutoff,
-                                                            Ts=1.6,
+                                                            Ts=Ts,
                                                             delta_f=0.2)
     # MPC-Calculations SSI
     MPC_ssi = []
@@ -144,9 +146,3 @@ if __name__ == '__main__':
     # Compare the two results using the MAC-Matrix
     oma.plot_mac_matrix(PHI_ssi, PHI_fdd, wn_ssi, wn_fdd)
 
-    # Compare to the xpected results
-    wn_exp = [2.38, 11.82, 20.23]
-    PHI_exp = np.array([[-0.047, -0.495, -0.506], [0.705, -0.023, -0.050], [0.019, -0.394, 0.639]], dtype=np.complex_)
-
-    # Compare the two results using the MAC-Matrix
-    oma.plot_mac_matrix(PHI_fdd, PHI_exp, wn_fdd, wn_exp)

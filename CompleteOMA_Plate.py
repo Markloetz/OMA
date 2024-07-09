@@ -77,6 +77,7 @@ if __name__ == '__main__':
                                                      y=20 * np.log10(S),
                                                      freqs=freqs,
                                                      label=status,
+                                                     ord_min=ord_min,
                                                      cutoff=cutoff)
 
     '''Extract modal damping by averaging over the damping values of each dataset'''

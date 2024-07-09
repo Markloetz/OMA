@@ -257,8 +257,8 @@ def prominence_adjust(x, y, cutoff):
     """prominence_adjust(x, y, cutoff) is a UI-function to interactively change the peak prominence of the findpeaks
     function, to allow for the user to perform peak picking without too many available peaks... """
     # Enable LaTeX rendering
-    # plt.rc('text', usetex=True)
-    # plt.rc('font', family='serif')
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
     # Adjusting peak-prominence with slider
     min_prominence = 0
     max_prominence = abs(max(y))
@@ -306,8 +306,8 @@ def peak_picking(x, y, y2, n_sval=1, cutoff=100):
     """peak_picking(x, y, y2, n_sval=1, cutoff=100) is a UI-function which allows the user to pick the peaks on a
     spectrum, which it then returns... """
     # Enable LaTeX rendering
-    # plt.rc('text', usetex=True)
-    # plt.rc('font', family='serif')
+    plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
     y = y.ravel()
     y2 = y2.ravel()
     x = x.ravel()
@@ -417,7 +417,7 @@ def find_widest_range(array, center_indices):
     return out
 
 
-def sdof_time_domain_fit(y, f, n_skip=4, n_peaks=30, plot=True):
+def sdof_time_domain_fit(y, f, n_skip=1, n_peaks=30, plot=True):
     """sdof_time_domain_fit(y, f, n_skip=4, n_peaks=30, plot=True) performs the fitting of the logarithmic decay of
     an SDOF-Equivalent, as is usual for EFDD. This code is partially taken from dagghe's pyOMA ->
     https://github.com/dagghe/PyOMA """
@@ -467,6 +467,10 @@ def sdof_time_domain_fit(y, f, n_skip=4, n_peaks=30, plot=True):
         n_peaks = len(minmax) - n_skip
     minmax_fit = np.array([minmax[_a] for _a in range(n_skip, n_skip + n_peaks)])
     minmax_fit_idx = np.array([minmax_idx[_a] for _a in range(n_skip, n_skip + n_peaks)])
+    if len(minmax_fit_idx) < 4:
+        print("Estimation of Damping could not be performed adequately... The amount of zero-crossings is not "
+              "sufficent for a proper fit")
+        return np.nan, np.nan
     # natural frequency estimation
     fn_est = 1 / np.mean(np.diff(t[minmax_fit_idx]) * 2)
     # plot the minima and maxima over the free decay

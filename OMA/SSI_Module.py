@@ -217,11 +217,10 @@ def SSICOV(y, dt, Ts, ord_min, ord_max, limits):
     return fn2, zeta2, phi2, order, MAC, stability_status
 
 
-def stabilization_diag(freqs, label, cutoff, plot="stable"):
+def stabilization_diag(freqs, label, cutoff, order_min, plot="stable"):
     """returns the figure/axes object of a stabilization diagram. Specify if all poles if all poles are to be plotted
     with all and only poles stable in all categories with stable"""
     # Create a figure and axis object
-    order_min = len(freqs[0])
     fig, ax = plt.subplots()
     # Enable LaTeX rendering
     plt.rc('text', usetex=True)
@@ -355,7 +354,7 @@ def ssi_extract(freqs, zeta, modes, label, ranges):
     return freqs_out, zeta_out, modes_out
 
 
-def prominence_adjust_ssi(x, y, freqs, label, cutoff):
+def prominence_adjust_ssi(x, y, freqs, label, ord_min, cutoff):
     """is a UI-function to interactively change the peak prominence of the findpeaks
     function, to allow for the user to perform peak picking without too many available peaks... """
     # Enable LaTeX rendering
@@ -373,6 +372,7 @@ def prominence_adjust_ssi(x, y, freqs, label, cutoff):
     # Create the plot
     figure, ax1 = stabilization_diag(freqs=freqs,
                                      label=label,
+                                     order_min=ord_min,
                                      cutoff=cutoff)
     ax = ax1.twinx()
     plt.subplots_adjust(bottom=0.25)  # Adjust bottom to make space for the slider
@@ -408,7 +408,7 @@ def prominence_adjust_ssi(x, y, freqs, label, cutoff):
     return SliderValClass.slider_val
 
 
-def peak_picking_ssi(x, y, freqs, label, cutoff=100):
+def peak_picking_ssi(x, y, freqs, label, ord_min, cutoff=100):
     """is a UI-function which allows the user to pick the peaks on a
     spectrum, where the stability diagram from the SSI calculations are overlayed, which it then returns... """
     y = y.ravel()
@@ -420,13 +420,17 @@ def peak_picking_ssi(x, y, freqs, label, cutoff=100):
                                                            y=y,
                                                            freqs=freqs,
                                                            label=label,
+                                                           ord_min=ord_min,
                                                            cutoff=cutoff),
                                      None))
     y_data = y[locs]
     x_data = x[locs]
     # Peak Picking
     # Create a figure and axis
-    figure, ax_1 = stabilization_diag(freqs, label, cutoff)
+    figure, ax_1 = stabilization_diag(freqs=freqs,
+                                      label=label,
+                                      order_min=ord_min,
+                                      cutoff=cutoff)
     ax = ax_1.twinx()
     # Enable LaTeX rendering
     plt.rc('text', usetex=True)

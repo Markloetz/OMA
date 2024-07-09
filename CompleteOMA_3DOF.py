@@ -81,6 +81,7 @@ if __name__ == '__main__':
                                                      y=20 * np.log10(S),
                                                      freqs=freqs,
                                                      label=status,
+                                                     ord_min=ord_min,
                                                      cutoff=cutoff)
 
     '''Extract modal parameters by averaging over each dataset'''

@@ -50,7 +50,7 @@ if __name__ == '__main__':
                                                       ord_max=ord_max,
                                                       limits=limits)
 
-    oma.ssi.stabilization_diag(freqs=freqs, label=status, cutoff=cutoff)
+    oma.ssi.stabilization_diag(freqs=freqs, label=status, ord_min=ord_min, cutoff=cutoff)
     plt.show()
 
     # Save Results from SSI
