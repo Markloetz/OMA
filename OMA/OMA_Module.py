@@ -143,7 +143,7 @@ def modal_extract_fdd(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPea
                               downsample=False,
                               cutoff=Fs // 2)
 
-        mCPSD, vf = fdd.cpsd_matrix(data=data,
+        mCPSD, vf = fdd.cpsd_matrix(data=data[:, :2],
                                     fs=Fs,
                                     n_seg=n_seg,
                                     window=window,
@@ -193,8 +193,8 @@ def modal_extract_fdd(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPea
 
         # Plotting the singular values
         if plot:
-            plt.rc('text', usetex=True)
-            plt.rc('font', family='serif')
+            # plt.rc('text', usetex=True)
+            # plt.rc('font', family='serif')
             for j in range(nPeaks):
                 fSDOF_temp = fSDOF[:, j][~np.isnan(fSDOF[:, j])]
                 sSDOF_temp_1 = sSDOF[:, j][~np.isnan(sSDOF[:, j])]

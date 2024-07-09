@@ -10,21 +10,21 @@ if __name__ == '__main__':
     Fs = 2048
 
     # Path of Measurement Files and other specifications
-    path = "Data/GrenoblerBruecke/"
+    path = "Data/GrenoblerBruecke/z-data/"
     n_rov = 2
-    n_ref = None
+    n_ref = 0
     ref_channel = None
     rov_channel = [0, 1]
     ref_position = None
 
     # Cutoff frequency (band of interest)
-    cutoff = 30
+    cutoff = 20
 
     # measurement duration
     t_end = 1200
 
     # Threshold for MAC
-    mac_threshold = 0.99
+    mac_threshold = 0.98
 
     # Decide if harmonic filtering is active
     filt = False
@@ -47,6 +47,8 @@ if __name__ == '__main__':
                              detrend=True,
                              cutoff=cutoff,
                              downsample=False)
+    
+    acc = acc[:, :2]
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc,
@@ -80,7 +82,7 @@ if __name__ == '__main__':
                                                 overlap=overlap,
                                                 n_seg=n_seg,
                                                 mac_threshold=mac_threshold,
-                                                plot=False)
+                                                plot=True)
 
     # MPC-Calculations
     MPC = []

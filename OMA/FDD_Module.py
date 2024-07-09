@@ -257,8 +257,8 @@ def prominence_adjust(x, y, cutoff):
     """prominence_adjust(x, y, cutoff) is a UI-function to interactively change the peak prominence of the findpeaks
     function, to allow for the user to perform peak picking without too many available peaks... """
     # Enable LaTeX rendering
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
+    # plt.rc('text', usetex=True)
+    # plt.rc('font', family='serif')
     # Adjusting peak-prominence with slider
     min_prominence = 0
     max_prominence = abs(max(y))
@@ -306,8 +306,8 @@ def peak_picking(x, y, y2, n_sval=1, cutoff=100):
     """peak_picking(x, y, y2, n_sval=1, cutoff=100) is a UI-function which allows the user to pick the peaks on a
     spectrum, which it then returns... """
     # Enable LaTeX rendering
-    plt.rc('text', usetex=True)
-    plt.rc('font', family='serif')
+    # plt.rc('text', usetex=True)
+    # plt.rc('font', family='serif')
     y = y.ravel()
     y2 = y2.ravel()
     x = x.ravel()
