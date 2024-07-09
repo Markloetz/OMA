@@ -24,14 +24,14 @@ if __name__ == '__main__':
     t_end = 1200
 
     # Threshold for MAC
-    mac_threshold = 0.98
+    mac_threshold = 0.99
 
     # Decide if harmonic filtering is active
     filt = False
 
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 100
+    n_seg = 120
     overlap = 0.5
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
