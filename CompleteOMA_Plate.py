@@ -21,7 +21,7 @@ if __name__ == '__main__':
     discretization = scipy.io.loadmat('Discretizations/PlateHoleDiscretization.mat')
 
     # Cutoff frequency (band of interest)
-    cutoff = 200
+    cutoff = 100
 
     # measurement duration
     t_end = 500
@@ -126,7 +126,7 @@ if __name__ == '__main__':
                                                                                     ord_max=ord_max,
                                                                                     plot=False,
                                                                                     cutoff=cutoff,
-                                                                                    Ts=0.8,
+                                                                                    Ts=0.3,
                                                                                     delta_f=0.2)
     # MPC-Calculations SSI
     MPC_ssi = []

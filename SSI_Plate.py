@@ -17,18 +17,18 @@ if __name__ == '__main__':
     ref_position = [1, 15]
 
     # Cutoff frequency (band of interest)
-    cutoff = 200
+    cutoff = 100
 
     # measurement duration
     t_end = 500
 
     # SSI-Parameters
     f_lim = 0.05  # Pole stability (frequency)
-    z_lim = 0.01  # Pole stability (damping)
+    z_lim = 0.08  # Pole stability (damping)
     mac_lim = 0.15  # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
-    ord_min = 5
-    ord_max = 60
+    ord_min = 50
+    ord_max = 200
     Ts = 0.3
 
     '''SVD Procedure on SV-diagram of the whole dataset'''
@@ -41,7 +41,7 @@ if __name__ == '__main__':
                              ref_pos=ref_position,
                              t_meas=t_end,
                              detrend=True,
-                             cutoff=int(cutoff*1.5),
+                             cutoff=cutoff,
                              downsample=False)
 
     freqs, zeta, modes, _, _, status = oma.ssi.SSICOV(acc,

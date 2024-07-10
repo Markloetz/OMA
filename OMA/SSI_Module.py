@@ -58,7 +58,7 @@ def mac_calc(phi, u):
 def sv_decomp_ssi(p):
     """ performs the singular value decomposition of the Toeplitz Matrix needed for SSI-COV..."""
     print("     SVD started...")
-    u, s, v_t = np.linalg.svd(p, full_matrices=False)
+    u, s, v_t = np.linalg.svd(p, full_matrices=False, hermitian=True)
     s = np.sqrt(np.diag(s))
     print("     SVD ended...")
     return u, s, v_t
