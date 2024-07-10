@@ -3,14 +3,13 @@ import scipy
 import matplotlib.pyplot as plt
 
 if __name__ == '__main__':
-    filename = "Discretizations/TiflisBruecke.mat"
+    filename = "Discretizations/GrenoblerBruecke.mat"
 
     # main Parameters for mesh generation
-    length = 42.8
-    width = 5.75
-    n_rows = 8
+    length = 72.85
+    width = 3.5
+    n_rows = 3
     n_cols = 2
-    polygon_shape = 4
 
     # create node coordinates
     nodes = np.zeros((n_rows * n_cols, n_cols))

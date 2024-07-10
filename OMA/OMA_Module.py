@@ -546,6 +546,160 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, pl
         plt.show()
 
 
+def animate_modeshape_triax(N, E, f_n, zeta_n, mode_x, mode_y, mode_z, mpc, directory, mode_nr, plot=True):
+    """ Mode Shape animation function to create and store a gif of the specified mode shape and show it to the
+    user... """
+
+    # Create a custom symmetrical colormap
+    def symmetrical_colormap(cmap):
+        n = 128
+        colors_r = cmap(np.linspace(0, 1, n))
+        colors_l = colors_r[::-1]
+        colors_ = np.vstack((colors_l, colors_r))
+        my_map = colors.LinearSegmentedColormap.from_list('symmetric_jet', colors_)
+        return my_map
+
+    # Function to set axis of 3d plot equal
+    def set_axes_equal(ax):
+        x_limits = ax.get_xlim3d()
+        y_limits = ax.get_ylim3d()
+        z_limits = ax.get_zlim3d()
+
+        x_range = abs(x_limits[1] - x_limits[0])
+        x_middle = np.mean(x_limits)
+        y_range = abs(y_limits[1] - y_limits[0])
+        y_middle = np.mean(y_limits)
+        z_range = abs(z_limits[1] - z_limits[0])
+        z_middle = np.mean(z_limits)
+
+        plot_radius = 0.5 * max([x_range, y_range, z_range])
+
+        ax.set_xlim3d([x_middle - plot_radius, x_middle + plot_radius])
+        ax.set_ylim3d([y_middle - plot_radius, y_middle + plot_radius])
+        ax.set_zlim3d([z_middle - plot_radius, z_middle + plot_radius])
+
+    # Pre-Animation Calculations (Initial Data)
+    if np.sum(mode_x) == 0 or mode_x.any() == np.nan:
+        mode_x = np.zeros(mode_x.shape) + 1
+        mode_y = np.zeros(mode_y.shape) + 1
+        mode_z = np.zeros(mode_z.shape) + 1
+    # Get the longest dimension in x and y direction to determine the z-scaling and the limits
+    x_diff = np.max(N[:, 0]) - np.min(N[:, 0])
+    y_diff = np.max(N[:, 1]) - np.min(N[:, 1])
+    longest_dim = np.max([x_diff, y_diff])
+    # scale z-mode
+    mode_z = mode_z / np.max(np.abs(mode_z)) * (longest_dim / 15)
+    # scale other modes after z (adjust if necessary)
+    mode_x = mode_x / np.max(np.abs(mode_z)) * (longest_dim / 15)
+    mode_y = mode_y / np.max(np.abs(mode_z)) * (longest_dim / 15)
+
+    # Add mode shape results to modes
+    N_temp = np.zeros((N.shape[0], N.shape[1] + 1), dtype=np.complex_)
+    N_temp[:, 2] = mode_z
+    N_temp[:, 0] = N[:, 0]
+    N_temp[:, 1] = N[:, 1]
+    N = N_temp
+
+    x = []
+    y = []
+    z = []
+    refined_x = []
+    refined_y = []
+    refined_z = []
+    for e, element in enumerate(E):
+        nodes = np.zeros((3, 3), dtype=np.complex_)
+        for i, node_idx in enumerate(element):
+            nodes[i, :] = N[node_idx - 1, :]
+        x.append(nodes[:, 0])
+        y.append(nodes[:, 1])
+        z.append(nodes[:, 2])
+    n_frames = 20
+    for frame in range(n_frames):
+        new_x = []
+        new_y = []
+        new_z = []
+        for i in range(len(E)):
+            _z = z[i].real * np.cos(np.pi / 5 * frame) + z[i].imag * np.sin(np.pi / 5 * frame)
+            triang = tri.Triangulation(x[i].real * np.cos(np.pi / 5 * frame) + x[i].imag * np.sin(np.pi / 5 * frame),
+                                       y[i].real * np.cos(np.pi / 5 * frame) + y[i].imag * np.sin(np.pi / 5 * frame))
+            refiner = tri.UniformTriRefiner(triang)
+            interpolator = tri.LinearTriInterpolator(triang, _z)
+            new, new_z_temp = refiner.refine_field(_z, interpolator, subdiv=3)
+            new_x.append(new.x)
+            new_y.append(new.y)
+            new_z.append(new_z_temp)
+        new_x = np.array(new_x).flatten()
+        new_y = np.array(new_y).flatten()
+        new_z = np.array(new_z).flatten()
+        refined_x.append(new_x)
+        refined_y.append(new_y)
+        refined_z.append(new_z)
+
+    def update(frame, art1):
+        art1[0].remove()
+        art1[0] = ax.plot_trisurf(
+            N[:, 0].real + mode_x * np.cos(np.pi / 5 * frame) + mode_x.imag * np.sin(np.pi / 5 * frame),
+            N[:, 1].real + mode_y * np.cos(np.pi / 5 * frame) + mode_y.imag * np.sin(np.pi / 5 * frame),
+            N[:, 2].real * np.cos(np.pi / 5 * frame) + N[:, 2].imag * np.sin(np.pi / 5 * frame),
+            triangles=E - 1,
+            cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
+            edgecolor='black')
+        return art1[0]
+
+    # fig = plt.figure()
+    # norm = colors.Normalize(vmin=-np.max(np.abs(N[:, 2].real)) * 1.3, vmax=np.max(np.abs(N[:, 2].real)) * 1.3,
+    #                         clip=False)
+    # myMap = symmetrical_colormap(cm.jet)
+    # ax = fig.add_subplot(111, projection='3d')
+    # title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz (Zeta = {round(zeta_n * 100, 2)}%; MPC = {round(mpc * 100, 2)})"
+    # ax.set_title(title)
+    # ax.set_xlim(np.min(N[:, 0].real), np.max(N[:, 0].real))
+    # ax.set_xlabel('X')
+    # ax.set_ylabel('Y')
+    # ax.set_zlabel('Z')
+    # ax.set_title(title)
+    # set_axes_equal(ax)
+    # art1 = [ax.plot_trisurf(N[:, 0].real + mode_x * np.cos(np.pi / 5 * 0) + mode_x.imag * np.sin(np.pi / 5 * 0),
+    #                         N[:, 1].real + mode_y * np.cos(np.pi / 5 * 0) + mode_y.imag * np.sin(np.pi / 5 * 0),
+    #                         N[:, 2].real * np.cos(0) + np.real(N[:, 2].imag) * np.sin(0),
+    #                         triangles=E - 1,
+    #                         cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
+    #                         edgecolor='black')]
+
+    # ani = animation.FuncAnimation(fig=fig, func=update, fargs=(art1), frames=n_frames, interval=100, blit=False)
+    # plt.show()
+    # create directory if it doesn't exist:
+    # filename = f"{directory}mode_{round(f_n)}Hz.gif"
+    # if not os.path.exists(directory):
+    #     os.makedirs(directory)
+    # # save the animation
+    # print("Saving Animation...")
+    # ani.save(filename, writer='pillow')
+    # print(f"Animation saved to {filename}!")
+
+    if plot:
+        # Enable LaTeX rendering
+        plt.rc('text', usetex=True)
+        plt.rc('font', family='serif')
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+        title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz (Zeta = {round(zeta_n * 100, 2)}\,\%; MPC = {round(mpc * 100, 2)})"
+        ax.set_title(title)
+        ax.set_xlim(np.min(N[:, 0].real), np.max(N[:, 0].real))
+        ax.set_xlabel(r'x')
+        ax.set_ylabel(r'y')
+        ax.set_zlabel(r'$Modal\,Displacement$')
+        ax.set_title(title)
+        set_axes_equal(ax)
+        ax.plot_trisurf(N[:, 0].real,
+                        N[:, 1].real,
+                        N[:, 2].real * np.cos(0) + np.real(N[:, 2].imag) * np.sin(0),
+                        triangles=E - 1,
+                        cmap=colors.ListedColormap([(1, 0, 0, 0), (0, 1, 0, 0), (0, 0, 1, 0)]), linewidth=1,
+                        edgecolor='black')
+        plt.show()
+
+
 def mpc(phi_r, phi_i):
     """mpc(phi_r, phi_i) calculates the Modal Phase Collinearity of a mode shape, which is an indicator for its
     complexity... """

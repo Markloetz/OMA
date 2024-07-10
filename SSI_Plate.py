@@ -29,6 +29,7 @@ if __name__ == '__main__':
     limits = [f_lim, z_lim, mac_lim]
     ord_min = 5
     ord_max = 60
+    Ts = 0.3
 
     '''SVD Procedure on SV-diagram of the whole dataset'''
     acc, Fs = oma.merge_data(path=path,
@@ -40,17 +41,17 @@ if __name__ == '__main__':
                              ref_pos=ref_position,
                              t_meas=t_end,
                              detrend=True,
-                             cutoff=cutoff * 4,
+                             cutoff=int(cutoff*1.5),
                              downsample=False)
 
     freqs, zeta, modes, _, _, status = oma.ssi.SSICOV(acc,
                                                       dt=1 / Fs,
-                                                      Ts=0.5,
+                                                      Ts=Ts,
                                                       ord_min=ord_min,
                                                       ord_max=ord_max,
                                                       limits=limits)
 
-    oma.ssi.stabilization_diag(freqs=freqs, label=status, ord_min=ord_min, cutoff=cutoff)
+    oma.ssi.stabilization_diag(freqs=freqs, label=status, order_min=ord_min, cutoff=cutoff)
     plt.show()
 
     # Save Results from SSI
