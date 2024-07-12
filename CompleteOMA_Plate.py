@@ -35,12 +35,13 @@ if __name__ == '__main__':
     overlap = 0.5
 
     # SSI-Parameters
-    f_lim = 0.05    # Pole stability (frequency)
-    z_lim = 0.1     # Pole stability (damping)
-    mac_lim = 0.1   # Mode stability (MAC-Value)
+    f_lim = 0.01    # Pole stability (frequency)
+    z_lim = 0.05    # Pole stability (damping)
+    mac_lim = 0.03   # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
-    ord_min = 5
+    ord_min = 10
     ord_max = 60
+    Ts = 0.3
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
     # import data
@@ -126,8 +127,8 @@ if __name__ == '__main__':
                                                                                     ord_max=ord_max,
                                                                                     plot=False,
                                                                                     cutoff=cutoff,
-                                                                                    Ts=0.3,
-                                                                                    delta_f=0.2)
+                                                                                    Ts=Ts,
+                                                                                    delta_f=0.3)
     # MPC-Calculations SSI
     MPC_ssi = []
     for i in range(nPeaks):
@@ -154,23 +155,23 @@ if __name__ == '__main__':
     for i in range(nPeaks):
         oma.animate_modeshape(N,
                               E,
-                              mode_shape=PHI_fdd[:, i],
+                              mode_shape=PHI_fdd[i, :],
                               f_n=wn_fdd[i],
                               zeta_n=zeta_fdd[i],
                               mpc=MPC_fdd[i],
                               directory="Animations/Plate_FDD/",
                               mode_nr=i,
-                              plot=True)
+                              plot=False)
 
     # 3d-Plot all Mode shapes from the SSI
     for i in range(nPeaks):
         oma.animate_modeshape(N,
-                              E + 1,
-                              mode_shape=PHI_ssi,
+                              E,
+                              mode_shape=PHI_ssi[i, :],
                               f_n=wn_ssi[i],
                               zeta_n=zeta_ssi[i],
                               mpc=MPC_ssi[i],
                               directory="Animations/Plate_SSI/",
                               mode_nr=i,
-                              plot=True)
+                              plot=False)
 

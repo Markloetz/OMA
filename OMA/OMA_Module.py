@@ -144,7 +144,7 @@ def modal_extract_fdd(path, Fs, n_rov, n_ref, ref_channel, ref_pos, t_meas, fPea
                               downsample=False,
                               cutoff=Fs // 2)
 
-        mCPSD, vf = fdd.cpsd_matrix(data=data[:, :2],
+        mCPSD, vf = fdd.cpsd_matrix(data=data,
                                     fs=Fs,
                                     n_seg=n_seg,
                                     window=window,
@@ -489,7 +489,7 @@ def animate_modeshape(N, E, f_n, zeta_n, mode_shape, mpc, directory, mode_nr, pl
                             clip=False)
     myMap = symmetrical_colormap(cm.jet)
     ax = fig.add_subplot(111, projection='3d')
-    title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz (Zeta = {round(zeta_n * 100, 2)}%; MPC = {round(mpc * 100, 2)})"
+    title = f"Mode {mode_nr + 1} at {round(f_n, 2)}Hz (Zeta = {round(zeta_n * 100, 2)}\,\%; MPC = {round(mpc*100, 2)})"
     ax.set_title(title)
     ax.set_xlim(np.min(N[:, 0].real), np.max(N[:, 0].real))
     ax.set_xlabel('X')

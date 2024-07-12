@@ -27,8 +27,8 @@ if __name__ == '__main__':
     z_lim = 0.08  # Pole stability (damping)
     mac_lim = 0.15  # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
-    ord_min = 50
-    ord_max = 200
+    ord_min = 10
+    ord_max = 60
     Ts = 0.3
 
     '''SVD Procedure on SV-diagram of the whole dataset'''

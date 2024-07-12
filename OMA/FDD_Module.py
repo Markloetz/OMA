@@ -366,11 +366,22 @@ def peak_picking(x, y, y2, n_sval=1, cutoff=100):
     plt.show()
 
     # remove multiple entries at same spot
-    for i in range(1, len(selected_points['x'])):
-        if selected_points['x'][i] == selected_points['x'][i - 1]:
-            del selected_points['x'][i]
-            del selected_points['y'][i]
+    # Use a set to track seen x values
+    seen = set()
+    unique_x = []
+    unique_y = []
 
+    # Iterate over the points and add to the new lists if not a duplicate
+    for i in range(len(selected_points['x'])):
+        x = selected_points['x'][i]
+        if x not in seen:
+            seen.add(x)
+            unique_x.append(x)
+            unique_y.append(selected_points['y'][i])
+
+    # Update the original lists
+    selected_points['x'] = unique_x
+    selected_points['y'] = unique_y
     # Store number of selected points
     n_points = len(selected_points['x'])
     y_out = np.array(selected_points['y'])

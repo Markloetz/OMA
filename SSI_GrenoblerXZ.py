@@ -1,4 +1,5 @@
 import pickle
+from matplotlib import pyplot as plt
 from OMA import OMA_Module as oma
 
 if __name__ == '__main__':
@@ -22,9 +23,9 @@ if __name__ == '__main__':
     t_end = 1200
 
     # SSI-Parameters
-    f_lim = 0.02  # Pole stability (frequency)
+    f_lim = 0.01  # Pole stability (frequency)
     z_lim = 0.05  # Pole stability (damping)
-    mac_lim = 0.05  # Mode stability (MAC-Value)
+    mac_lim = 0.01  # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
     ord_min = 5
     ord_max = 80
@@ -40,7 +41,7 @@ if __name__ == '__main__':
                              ref_pos=ref_position,
                              t_meas=t_end,
                              detrend=True,
-                             cutoff=cutoff,
+                             cutoff=cutoff*4,
                              downsample=False)
 
     freqs, zeta, modes, _, _, status = oma.ssi.SSICOV(acc,
@@ -59,3 +60,6 @@ if __name__ == '__main__':
         pickle.dump(zeta, f)
     with open('Data/SSI_Data/statusGrenoblerXZ.pkl', 'wb') as f:
         pickle.dump(status, f)
+
+    oma.ssi.stabilization_diag(freqs=freqs, label=status, order_min=ord_min, cutoff=cutoff)
+    plt.show()

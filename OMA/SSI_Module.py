@@ -58,7 +58,7 @@ def mac_calc(phi, u):
 def sv_decomp_ssi(p):
     """ performs the singular value decomposition of the Toeplitz Matrix needed for SSI-COV..."""
     print("     SVD started...")
-    u, s, v_t = np.linalg.svd(p, full_matrices=False, hermitian=True)
+    u, s, v_t = np.linalg.svd(p, full_matrices=False, hermitian=False)
     s = np.sqrt(np.diag(s))
     print("     SVD ended...")
     return u, s, v_t
@@ -77,7 +77,7 @@ def toeplitz(data, fs, Ts=0.5):
         for ll in range(1, N1 + 1):
             T1[(oo - 1) * M: oo * M, (ll - 1) * M: ll * M] = h[:, :, N1 + oo - ll]
     print("     Computation of the Toeplitz-Matrix complete!")
-    # return Toeplitz Matrices
+    # return Toeplitz Matrix
     return T1
 
 
@@ -476,10 +476,22 @@ def peak_picking_ssi(x, y, freqs, label, ord_min, cutoff=100):
     # Show the plot
     plt.show()
     # remove multiple entries at same spot
-    for i in range(1, len(selected_points['x'])):
-        if selected_points['x'][i] == selected_points['x'][i - 1]:
-            del selected_points['x'][i]
-            del selected_points['y'][i]
+    # Use a set to track seen x values
+    seen = set()
+    unique_x = []
+    unique_y = []
+
+    # Iterate over the points and add to the new lists if not a duplicate
+    for i in range(len(selected_points['x'])):
+        x = selected_points['x'][i]
+        if x not in seen:
+            seen.add(x)
+            unique_x.append(x)
+            unique_y.append(selected_points['y'][i])
+
+    # Update the original lists
+    selected_points['x'] = unique_x
+    selected_points['y'] = unique_y
 
     # Store number of selected points
     n_points = len(selected_points['x'])
