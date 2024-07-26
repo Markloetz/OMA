@@ -13,39 +13,27 @@ class SliderValClass:
 """Functions"""
 
 
-def NExT(x, dt, Ts, method=1):
+def NExT(x, dt, Ts):
     """ Performs the algorithm to get the covariance matrix of a dataset. This code is based on: Operational modal
     analysis with automated SSI-COV algorithm Version 2.5 from E. Cheynet..."""
     if len(x.shape) == 1:
         x = x[np.newaxis, :]  # Convert to 2D array with a single row if x is a 1D array
-    Nxx, _ = x.shape
+    n_ch, _ = x.shape
     # Maximal segment length fixed by T
     M = round(Ts / dt)
-    if method == 1:
-        IRF = np.zeros((Nxx, Nxx, M))
-        for oo in range(Nxx):
-            for jj in range(Nxx):
-                y1 = np.fft.fft(x[oo, :])
-                y2 = np.fft.fft(x[jj, :])
-                h0 = np.fft.ifft(y1 * np.conj(y2))
-                IRF[oo, jj, :] = h0[:M].real
-        # Time vector t associated to the IRF
-        t = np.arange(M) * dt
-        if Nxx == 1:
-            IRF = IRF.squeeze().T
-    else:  # method == 2
-        IRF = np.zeros((Nxx, Nxx, M + 1))
-        for oo in range(Nxx):
-            for jj in range(Nxx):
-                dummy = correlate(x[oo, :], x[jj, :], mode='full', method='auto') / len(x[oo, :])
-                mid = len(dummy) // 2
-                IRF[oo, jj, :] = dummy[mid:mid + M + 1]
-        if Nxx == 1:
-            IRF = IRF.squeeze().T
-        # Time vector t associated to the IRF
-        t = dt * np.arange(0, M + 1)
+    IRF = np.zeros((n_ch, n_ch, M))
+    for i in range(n_ch):
+        for j in range(n_ch):
+            y1 = np.fft.fft(x[i, :])
+            y2 = np.fft.fft(x[j, :])
+            h0 = np.fft.ifft(y1 * np.conj(y2))
+            IRF[i, j, :] = h0[:M].real
+    # Time vector t associated to the IRF
+    t = np.arange(M) * dt
+    if n_ch == 1:
+        IRF = IRF.squeeze().T
     # Normalize the IRF
-    if Nxx == 1:
+    if n_ch == 1:
         IRF = IRF / IRF[0]
     return IRF, t
 
@@ -55,11 +43,11 @@ def mac_calc(phi, u):
     return (np.abs(phi.conj().T @ u) ** 2) / ((phi.conj().T @ phi) * (u.conj().T @ u))
 
 
-def sv_decomp_ssi(p):
+def sv_decomp_ssi(t):
     """ performs the singular value decomposition of the Toeplitz Matrix needed for SSI-COV..."""
     print("     SVD started...")
-    u, s, v_t = np.linalg.svd(p, full_matrices=False, hermitian=False)
-    s = np.sqrt(np.diag(s))
+    u, s, v_t = np.linalg.svd(t, full_matrices=False)
+    s = np.diag(s)
     print("     SVD ended...")
     return u, s, v_t
 
@@ -77,29 +65,29 @@ def toeplitz(data, fs, Ts=0.5):
         for ll in range(1, N1 + 1):
             T1[(oo - 1) * M: oo * M, (ll - 1) * M: ll * M] = h[:, :, N1 + oo - ll]
     print("     Computation of the Toeplitz-Matrix complete!")
-    # return Toeplitz Matrix
+    # return Toeplitz Matrices
     return T1
 
 
-def modalID(U, S, Nmodes, Nyy, dt):
+def modalID(U, S, order, n_ch, dt):
     """extracts modal parameters from U and S from the Singular value decomposition by estimating the Matrices A and
     C. This code is based on: Operational modal analysis with automated SSI-COV algorithm Version 2.5 from E.
     Cheynet... """
-    if Nmodes >= S.shape[0]:
-        print(f'Warning: Nmodes is larger than the number of rows of S. Nmodes is reduced to {S.shape[0]}.')
-        Nmodes = S.shape[0]
-    obs = U[:, :Nmodes] @ np.sqrt(S[:Nmodes, :Nmodes])
-    IndO = min(Nyy, obs.shape[0])
-    C = obs[:IndO, :]
-    jb = round(obs.shape[0] / IndO)
-
-    A = np.linalg.pinv(obs[:IndO * (jb - 1), :]) @ obs[-IndO * (jb - 1):, :]
-    Di, Vi = np.linalg.eig(A)
-
-    mu = np.log(Di) / dt  # poles
-    fn = np.abs(mu[1::2]) / (2 * np.pi)  # eigen-frequencies
+    if order >= S.shape[0]:
+        print(f'Warning: Order is larger than the number of rows of S. Order is reduced to {S.shape[0]}.')
+        order = S.shape[0]
+    obs = U[:, :order] @ np.sqrt(S[:order, :order])
+    n_ch = min(n_ch, obs.shape[0])
+    C = obs[:n_ch, :]
+    block_length = round(obs.shape[0] / n_ch)
+    # System Matrix
+    A = np.linalg.pinv(obs[:n_ch * (block_length - 1), :]) @ obs[-n_ch * (block_length - 1):, :]
+    # Extracting mode shapes by eigenvalue analysis
+    mu_d, psi_d = np.linalg.eig(A)
+    mu = np.log(mu_d) / dt  # poles
+    fn = np.abs(mu[1::2]) / (2 * np.pi)  # eigen-frequencies -> every second entry due poles coming in pairs
     zeta = -np.real(mu[1::2]) / np.abs(mu[1::2])  # modal damping ratio
-    phi = C @ Vi  # mode shapes
+    phi = C @ psi_d  # mode shapes
     phi = phi[:, 1::2]
 
     return fn, zeta, phi
@@ -440,6 +428,7 @@ def peak_picking_ssi(x, y, freqs, label, ord_min, cutoff=100):
     limlow = np.min(y[:idx]) - (np.max(y[:idx]) - np.min(y[:idx])) * 0.1
     limhigh = np.max(y[:idx]) + (np.max(y[:idx]) - np.min(y[:idx])) * 0.1
     ax.set_ylim([limlow, limhigh])
+    # ax.set_ylim([-270, -170])
     # Store the selected points
     selected_points = {'x': [], 'y': []}
 

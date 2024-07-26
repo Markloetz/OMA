@@ -12,7 +12,7 @@ if __name__ == '__main__':
     file3 = "Data/TiflisBruecke2/Data_190624_pos_r1_07_08_r2.mat"
 
     # Cutoff frequency (band of interest)
-    cutoff = 25
+    cutoff = 20
 
     # measurement duration
     t_end = 500
@@ -46,7 +46,7 @@ if __name__ == '__main__':
                               plot=False)
     acc3, _ = oma.import_data(filename=file3,
                               fs=Fs,
-                              time=t_end*2,
+                              time=t_end,
                               detrend=True,
                               cutoff=cutoff * 4,
                               downsample=False,
@@ -64,7 +64,7 @@ if __name__ == '__main__':
     mac_threshold = 0.99
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 100
+    n_seg = 50
     overlap = 0.5
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc1,
@@ -81,7 +81,8 @@ if __name__ == '__main__':
                                                      y=20*np.log10(S),
                                                      freqs=freqs,
                                                      label=status,
-                                                     cutoff=cutoff)
+                                                     cutoff=cutoff,
+                                                     ord_min=ord_min)
 
     # Perform SSI
     freqs, zeta, modes, _, _, status = oma.ssi.SSICOV(acc2,
@@ -89,7 +90,7 @@ if __name__ == '__main__':
                                                       Ts=0.8,
                                                       ord_min=ord_min,
                                                       ord_max=ord_max,
-                                                      limits=limits)
+                                                      limits=limits,)
 
     # Build CPSD-Matrix from acceleration data
     mCPSD, vf = oma.fdd.cpsd_matrix(data=acc2,
@@ -106,7 +107,8 @@ if __name__ == '__main__':
                                                      y=20*np.log10(S),
                                                      freqs=freqs,
                                                      label=status,
-                                                     cutoff=cutoff)
+                                                     cutoff=cutoff,
+                                                     ord_min=ord_min)
 
     # Perform SSI
     freqs, zeta, modes, _, _, status = oma.ssi.SSICOV(acc3[:, :3],
@@ -131,4 +133,5 @@ if __name__ == '__main__':
                                                      y=20*np.log10(S),
                                                      freqs=freqs,
                                                      label=status,
-                                                     cutoff=cutoff)
+                                                     cutoff=cutoff,
+                                                     ord_min=ord_min)

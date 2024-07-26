@@ -28,7 +28,7 @@ if __name__ == '__main__':
     limits = [f_lim, z_lim, mac_lim]
     ord_min = 5
     ord_max = 60
-    Ts = 8
+    Ts = 2
 
     '''SVD Procedure on SV-diagram of the whole dataset'''
     acc, Fs = oma.merge_data(path=path,

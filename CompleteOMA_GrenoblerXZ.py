@@ -1,5 +1,7 @@
 import numpy as np
 import scipy
+from matplotlib import pyplot as plt
+
 from OMA import OMA_Module as oma
 import pickle
 
@@ -12,14 +14,14 @@ if __name__ == '__main__':
     # Path of Measurement Files and other specifications
     path = "Data/GrenoblerBrueckeXZ/"
     discretization = scipy.io.loadmat('Discretizations/GrenoblerBruecke.mat')
-    n_rov = 2
+    n_rov = 4
     n_ref = 0
     ref_channel = None
-    rov_channel = [0, 1]
+    rov_channel = [0, 1, 2, 3]
     ref_position = None
 
     # Cutoff frequency (band of interest)
-    cutoff = 55
+    cutoff = 40
 
     # Decide if harmonic estimation needs to be used
     filt = False
@@ -28,11 +30,11 @@ if __name__ == '__main__':
     t_end = 1200
 
     # Threshold for MAC
-    mac_threshold = 0.98
+    mac_threshold = 0.9
 
     # Welch's Method Parameters
     window = 'hann'
-    n_seg = 100
+    n_seg = 200
     overlap = 0.5
 
     # SSI-Parameters
@@ -135,27 +137,8 @@ if __name__ == '__main__':
     print("Modal Phase Collinearity:")
     print(MPC_ssi)
 
-    # Compare the two results using the MAC-Matrix
-    # oma.plot_mac_matrix(PHI_ssi, PHI_fdd, wn_ssi, wn_fdd)
-
-    # 3d-Plot all Mode shapes from the FDD
-    N = discretization['N']
-    E = discretization['E']
+    # plot mode shapes
     for i in range(nPeaks):
-        modeX = np.zeros(PHI_ssi.shape[0]//3 + 4, dtype=np.complex_)
-        modeX[2:-2] = PHI_ssi[0:2, i]
-        modeY = np.zeros(PHI_ssi.shape[0]//3 + 4, dtype=np.complex_)
-        modeY[2:-2] = PHI_ssi[2:4, i]
-        modeZ = np.zeros(PHI_ssi.shape[0]//3 + 4, dtype=np.complex_)
-        modeZ[2:-2] = PHI_ssi[4:-1, i]
-        oma.animate_modeshape_triax(N,
-                                    E+1,
-                                    mode_x=modeY,
-                                    mode_y=modeX,
-                                    mode_z=modeZ,
-                                    f_n=wn_ssi[i],
-                                    zeta_n=zeta_ssi[i],
-                                    mpc=MPC_ssi[i],
-                                    directory="Animations/Grenobler_FDD/",
-                                    mode_nr=i,
-                                    plot=True)
+        plt.plot(PHI_ssi[i, :], label=f"mode {i+1}; x1x2, z1z2")
+    plt.legend()
+    plt.show()

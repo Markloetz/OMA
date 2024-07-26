@@ -33,12 +33,13 @@ if __name__ == '__main__':
     overlap = 0.5
 
     # SSI-Parameters
-    f_lim = 0.05  # Pole stability (frequency)
-    z_lim = 0.1  # Pole stability (damping)
-    mac_lim = 0.1  # Mode stability (MAC-Value)
+    f_lim = 0.01    # Pole stability (frequency)
+    z_lim = 0.05    # Pole stability (damping)
+    mac_lim = 0.01  # Mode stability (MAC-Value)
     limits = [f_lim, z_lim, mac_lim]
-    ord_min = 1
+    ord_min = 0
     ord_max = 30
+    Ts = 2.7
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
     # import data
@@ -51,7 +52,7 @@ if __name__ == '__main__':
                              ref_pos=ref_position,
                              t_meas=t_end,
                              detrend=True,
-                             cutoff=cutoff,
+                             cutoff=cutoff*10,
                              downsample=False)
 
     # Build CPSD-Matrix from acceleration data
@@ -66,13 +67,13 @@ if __name__ == '__main__':
 
     # Filter the harmonics
     if filt:
-        f_harmonic = oma.fdd.harmonic_est(data=acc, delta_f=0.1, f_max=cutoff, fs=Fs, plot=True)
+        f_harmonic = oma.fdd.harmonic_est(data=acc, delta_f=0.25, f_max=cutoff, fs=Fs, plot=True)
         S = oma.fdd.eliminate_harmonic(vf, 20 * np.log10(S), f_harmonic[1:-1], cutoff=cutoff)
 
     # SSI
     freqs, zeta, modes, _, _, status = oma.ssi.SSICOV(acc,
                                                       dt=1 / Fs,
-                                                      Ts=1.6,
+                                                      Ts=Ts,
                                                       ord_min=ord_min,
                                                       ord_max=ord_max,
                                                       limits=limits)
@@ -127,7 +128,7 @@ if __name__ == '__main__':
                                                             ord_max=ord_max,
                                                             plot=True,
                                                             cutoff=cutoff,
-                                                            Ts=1.6,
+                                                            Ts=Ts,
                                                             delta_f=0.2)
     # MPC-Calculations SSI
     MPC_ssi = []

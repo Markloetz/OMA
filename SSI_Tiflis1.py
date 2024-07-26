@@ -1,5 +1,7 @@
 import pickle
 import scipy
+from matplotlib import pyplot as plt
+
 from OMA import OMA_Module as oma
 
 if __name__ == '__main__':
@@ -32,6 +34,7 @@ if __name__ == '__main__':
     limits = [f_lim, z_lim, mac_lim]
     ord_min = 5
     ord_max = 60
+    Ts = 0.8
 
     '''SVD Procedure on SV-diagram of the whole dataset'''
     acc, Fs = oma.merge_data(path=path,
@@ -48,10 +51,13 @@ if __name__ == '__main__':
 
     freqs, zeta, modes, _, _, status = oma.ssi.SSICOV(acc,
                                                       dt=1 / Fs,
-                                                      Ts=0.8,
+                                                      Ts=Ts,
                                                       ord_min=ord_min,
                                                       ord_max=ord_max,
                                                       limits=limits)
+
+    oma.ssi.stabilization_diag(freqs=freqs, label=status, order_min=ord_min, cutoff=cutoff)
+    plt.show()
 
     # Save Results from SSI
     with open('Data/SSI_Data/freqsTiflis1.pkl', 'wb') as f:

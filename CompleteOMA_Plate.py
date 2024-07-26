@@ -64,6 +64,8 @@ if __name__ == '__main__':
                                     window=window,
                                     overlap=overlap)
 
+    print(vf)
+
     # SVD of CPSD-matrix @ each frequency
     S, U, S2, U2 = oma.fdd.sv_decomp(mCPSD)
 
@@ -173,5 +175,5 @@ if __name__ == '__main__':
                               mpc=MPC_ssi[i],
                               directory="Animations/Plate_SSI/",
                               mode_nr=i,
-                              plot=False)
+                              plot=True)
 

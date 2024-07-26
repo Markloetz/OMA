@@ -10,10 +10,10 @@ if __name__ == '__main__':
 
     # Path of Measurement Files and other specifications
     path = "Data/GrenoblerBrueckeXZ/"
-    n_rov = 2
+    n_rov = 4
     n_ref = 0
     ref_channel = None
-    rov_channel = [0, 1]
+    rov_channel = [0, 1, 2, 3]
     ref_position = None
 
     # Cutoff frequency (band of interest)
@@ -41,7 +41,7 @@ if __name__ == '__main__':
                              ref_pos=ref_position,
                              t_meas=t_end,
                              detrend=True,
-                             cutoff=cutoff*4,
+                             cutoff=cutoff*2,
                              downsample=False)
 
     freqs, zeta, modes, _, _, status = oma.ssi.SSICOV(acc,

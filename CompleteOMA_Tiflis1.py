@@ -41,6 +41,7 @@ if __name__ == '__main__':
     limits = [f_lim, z_lim, mac_lim]
     ord_min = 5
     ord_max = 60
+    Ts = 1.8
 
     '''Peak Picking Procedure on SV-diagram of the whole dataset'''
     # import data
@@ -126,7 +127,7 @@ if __name__ == '__main__':
                                                                                     ord_max=ord_max,
                                                                                     plot=False,
                                                                                     cutoff=cutoff,
-                                                                                    Ts=1)
+                                                                                    Ts=Ts)
     # MPC-Calculations SSI
     MPC_ssi = []
     for i in range(nPeaks):
@@ -146,6 +147,15 @@ if __name__ == '__main__':
 
     # Compare the two results using the MAC-Matrix
     oma.plot_mac_matrix(PHI_ssi, PHI_fdd, wn_ssi, wn_fdd)
+
+    # Load custom mesh node data
+    ema_results = scipy.io.loadmat('ComparisonData/EMA_modes.mat')
+    ema_modes = ema_results['mode'].T
+    ema_freqs = [1.87, 6.07, 6.89, 13.34, 16.93]
+    nPeaks = len(ema_freqs)
+
+    # Compare the two results using the MAC-Matrix
+    oma.plot_mac_matrix(PHI_ssi, ema_modes, wn_ssi, ema_freqs)
 
     # 3d-Plot all Mode shapes from the FDD
     N = discretization['N']
@@ -176,3 +186,5 @@ if __name__ == '__main__':
                               directory="Animations/Tiflis1_SSI/",
                               mode_nr=i,
                               plot=True)
+
+
